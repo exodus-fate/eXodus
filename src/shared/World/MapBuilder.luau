@@ -172,8 +172,19 @@ end
 local FLUORESCENT = Props.rgb(MapLayout.Palette.fluorescent)
 local AMBER = Props.rgb(MapLayout.Palette.amber)
 
-local function fluorescent(parent, pos, along, roomId, range, shadows)
+local function fluorescent(parent, pos, along, roomId, range, shadows, ceiling)
 	local size = along == "x" and Vector3.new(4, 0.2, 1.2) or Vector3.new(1.2, 0.2, 4)
+	if ceiling and ceiling - pos.Y > 0.5 then
+		local drop = ceiling - pos.Y
+		for _, side in { -1, 1 } do
+			local offset = along == "x" and Vector3.new(side * 1.6, 0, 0) or Vector3.new(0, 0, side * 1.6)
+			part(parent, "Rod", Vector3.new(0.08, drop, 0.08), CFrame.new(pos + offset + Vector3.new(0, drop / 2, 0)), "greyDark", {
+				collide = false,
+				shadow = false,
+				material = Enum.Material.Metal,
+			})
+		end
+	end
 	local panel = part(parent, "Fluorescent", size, CFrame.new(pos), FLUORESCENT, {
 		material = Enum.Material.Neon,
 		collide = false,
@@ -214,8 +225,11 @@ end
 local function buildLights(roomFolder, roomId, room)
 	local lights = folder(roomFolder, "Lights")
 	local w, d = room.x1 - room.x0, room.z1 - room.z0
-	local y = room.h - 0.15
-	local range = math.min(room.h + 6, 22)
+	-- Tall rooms (the transmitter chamber is 26 studs) hang their fixtures on rods
+	-- so the light still reaches the floor.
+	local ceiling = room.h - 0.15
+	local y = math.min(ceiling, 15)
+	local range = math.min(y + 7, 22)
 	if room.lights == "grid" then
 		local spacing = (w * d > 2000) and 20 or 17
 		local nx = math.max(1, math.floor(w / spacing + 0.5))
@@ -225,7 +239,7 @@ local function buildLights(roomFolder, roomId, room)
 				local x = room.x0 + w * (i - 0.5) / nx
 				local z = room.z0 + d * (j - 0.5) / nz
 				-- Only the first fixture casts shadows: atmosphere without the cost.
-				fluorescent(lights, Vector3.new(x, y, z), "x", roomId, range, i == 1 and j == 1 and not room.hq)
+				fluorescent(lights, Vector3.new(x, y, z), "x", roomId, range, i == 1 and j == 1 and not room.hq, ceiling)
 			end
 		end
 	elseif room.lights == "line" then
@@ -236,7 +250,7 @@ local function buildLights(roomFolder, roomId, room)
 			local t = (i - 0.5) / n
 			local pos = along == "x" and Vector3.new(room.x0 + w * t, y, (room.z0 + room.z1) / 2)
 				or Vector3.new((room.x0 + room.x1) / 2, y, room.z0 + d * t)
-			fluorescent(lights, pos, along, roomId, range, false)
+			fluorescent(lights, pos, along, roomId, range, false, ceiling)
 		end
 	end
 	if room.emergency then
@@ -244,9 +258,10 @@ local function buildLights(roomFolder, roomId, room)
 		if room.outdoor then
 			return lights
 		end
-		emergencyLight(lights, Vector3.new((room.x0 + room.x1) / 2, room.h - 1.2, room.z0 + T + 0.3), roomId, colour)
+		local ey = math.min(room.h - 1.2, 12)
+		emergencyLight(lights, Vector3.new((room.x0 + room.x1) / 2, ey, room.z0 + T + 0.3), roomId, colour)
 		if w * d > 1200 then
-			emergencyLight(lights, Vector3.new((room.x0 + room.x1) / 2, room.h - 1.2, room.z1 - T - 0.3), roomId, colour)
+			emergencyLight(lights, Vector3.new((room.x0 + room.x1) / 2, ey, room.z1 - T - 0.3), roomId, colour)
 		end
 	end
 	return lights
@@ -684,6 +699,8 @@ function Furnish.LoadingDock(f)
 	Props.floodlight(f, facing(Vector3.new(-27, 0, -137), SOUTH))
 	Props.floodlight(f, facing(Vector3.new(27, 0, -137), SOUTH))
 	Props.floodlight(f, facing(Vector3.new(27, 0, -106.5), NORTH))
+	-- Keeps the extraction van readable at night.
+	Props.floodlight(f, facing(Vector3.new(6.5, 0, -118), NORTH))
 	Props.crate(f, CFrame.new(-26, 0, -108), Vector3.new(3, 3, 3))
 	Props.crate(f, CFrame.new(-26, 0, -112), Vector3.new(2.5, 2.5, 2.5))
 end
