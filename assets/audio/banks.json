@@ -1,0 +1,897 @@
+{
+ "banks": {
+  "Ambience": {
+   "duration": 214.0,
+   "file": "DeadAir_Ambience.ogg"
+  },
+  "Music1": {
+   "duration": 280.8,
+   "file": "DeadAir_Music1.ogg"
+  },
+  "Music2": {
+   "duration": 84.0,
+   "file": "DeadAir_Music2.ogg"
+  },
+  "Sfx": {
+   "duration": 181.40759637188208,
+   "file": "DeadAir_Sfx.ogg"
+  }
+ },
+ "sounds": {
+  "Alarm": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 4.428594,
+   "loop": false,
+   "start": 0.25
+  },
+  "AmbDark": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 40,
+   "loop": true,
+   "start": 1.0
+  },
+  "AmbHQ": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 30,
+   "loop": true,
+   "start": 43.0
+  },
+  "AmbOutdoor": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 40,
+   "loop": true,
+   "start": 75.0
+  },
+  "AmbStation": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 40,
+   "loop": true,
+   "start": 117.0
+  },
+  "BreathIn": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.6,
+   "loop": false,
+   "start": 5.178594
+  },
+  "BreathOut": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.9,
+   "loop": false,
+   "start": 6.278594
+  },
+  "CageOpen": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.0,
+   "loop": false,
+   "start": 7.678594
+  },
+  "ChairScrape": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.744626,
+   "loop": false,
+   "start": 9.178594
+  },
+  "ChannelSwitch": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.25,
+   "loop": false,
+   "start": 11.42322
+  },
+  "Countdown": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.08,
+   "loop": false,
+   "start": 12.17322
+  },
+  "DeckClose": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.4,
+   "loop": false,
+   "start": 12.75322
+  },
+  "DeckHum": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 4,
+   "loop": true,
+   "start": 159.0
+  },
+  "DeckOpen": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.9,
+   "loop": false,
+   "start": 13.65322
+  },
+  "DeckPause": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.12,
+   "loop": false,
+   "start": 15.05322
+  },
+  "DeckPlay": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.35,
+   "loop": false,
+   "start": 15.67322
+  },
+  "Deploy": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 2.446848,
+   "loop": false,
+   "start": 16.52322
+  },
+  "DoorClose": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.907914,
+   "loop": false,
+   "start": 19.470068
+  },
+  "DoorForced": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.434717,
+   "loop": false,
+   "start": 20.877982
+  },
+  "DoorLocked": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.41093,
+   "loop": false,
+   "start": 22.812698
+  },
+  "DoorOpen": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.70966,
+   "loop": false,
+   "start": 23.723628
+  },
+  "EditCommit": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.418571,
+   "loop": false,
+   "start": 25.933288
+  },
+  "EditRejected": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.28,
+   "loop": false,
+   "start": 29.851859
+  },
+  "EditorShadow": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 3.882336,
+   "loop": false,
+   "start": 30.631859
+  },
+  "Eliminated": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 3.084853,
+   "loop": false,
+   "start": 35.014195
+  },
+  "EndOfTransmission": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.0,
+   "loop": false,
+   "start": 38.599048
+  },
+  "FlashlightOff": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.044989,
+   "loop": false,
+   "start": 42.099048
+  },
+  "FlashlightOn": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.05,
+   "loop": false,
+   "start": 42.644036
+  },
+  "Fluorescent": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 4,
+   "loop": true,
+   "start": 165.0
+  },
+  "FrameStep": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.02,
+   "loop": false,
+   "start": 43.194036
+  },
+  "FreightDoor": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 4.836553,
+   "loop": false,
+   "start": 43.714036
+  },
+  "GeneratorLoop": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 4,
+   "loop": true,
+   "start": 171.0
+  },
+  "GeneratorPrime": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.446236,
+   "loop": false,
+   "start": 49.05059
+  },
+  "GeneratorStart": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 4.318095,
+   "loop": false,
+   "start": 52.996825
+  },
+  "Heartbeat": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.490091,
+   "loop": false,
+   "start": 57.814921
+  },
+  "HuntEnd": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 3.385578,
+   "loop": false,
+   "start": 58.805011
+  },
+  "HuntStart": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 3.627619,
+   "loop": false,
+   "start": 62.69059
+  },
+  "Inspect": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.25,
+   "loop": false,
+   "start": 66.818209
+  },
+  "Install": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.485737,
+   "loop": false,
+   "start": 67.568209
+  },
+  "KeypadPress": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.09,
+   "loop": false,
+   "start": 69.553946
+  },
+  "KeypadRight": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.55,
+   "loop": false,
+   "start": 70.143946
+  },
+  "KeypadWrong": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.5,
+   "loop": false,
+   "start": 71.193946
+  },
+  "LightsFail": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.580204,
+   "loop": false,
+   "start": 72.193946
+  },
+  "LoopBreak": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 2.097302,
+   "loop": false,
+   "start": 75.27415
+  },
+  "LoopReset": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.0,
+   "loop": false,
+   "start": 77.871451
+  },
+  "LoopStart": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 2.25,
+   "loop": false,
+   "start": 79.371451
+  },
+  "MarkFrame": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.12,
+   "loop": false,
+   "start": 82.121451
+  },
+  "MenuClose": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.4,
+   "loop": false,
+   "start": 82.741451
+  },
+  "MenuOpen": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.9,
+   "loop": false,
+   "start": 83.641451
+  },
+  "MetalCreak": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.981655,
+   "loop": false,
+   "start": 85.041451
+  },
+  "MusicBriefing": {
+   "bank": "Music1",
+   "category": "music",
+   "length": 32,
+   "loop": true,
+   "start": 1.0
+  },
+  "MusicExplore": {
+   "bank": "Music1",
+   "category": "music",
+   "length": 64,
+   "loop": true,
+   "start": 35.0
+  },
+  "MusicExtract": {
+   "bank": "Music1",
+   "category": "music",
+   "length": 32,
+   "loop": true,
+   "start": 101.0
+  },
+  "MusicHunt": {
+   "bank": "Music1",
+   "category": "music",
+   "length": 25.6,
+   "loop": true,
+   "start": 135.0
+  },
+  "MusicLobby": {
+   "bank": "Music1",
+   "category": "music",
+   "length": 51.2,
+   "loop": true,
+   "start": 162.6
+  },
+  "MusicMenu": {
+   "bank": "Music1",
+   "category": "music",
+   "length": 64,
+   "loop": true,
+   "start": 215.8
+  },
+  "MusicReport": {
+   "bank": "Music2",
+   "category": "music",
+   "length": 48,
+   "loop": true,
+   "start": 1.0
+  },
+  "MusicTension": {
+   "bank": "Music2",
+   "category": "music",
+   "length": 32,
+   "loop": true,
+   "start": 51.0
+  },
+  "OnAir": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.4,
+   "loop": false,
+   "start": 89.523107
+  },
+  "PhoneRing": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.862245,
+   "loop": false,
+   "start": 92.423107
+  },
+  "PickupKey": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.195306,
+   "loop": false,
+   "start": 94.785351
+  },
+  "PickupMetal": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.085601,
+   "loop": false,
+   "start": 95.480658
+  },
+  "PickupTape": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.33,
+   "loop": false,
+   "start": 96.066259
+  },
+  "PowerOn": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.4661,
+   "loop": false,
+   "start": 96.896259
+  },
+  "PresenterAppear": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.758753,
+   "loop": false,
+   "start": 99.862358
+  },
+  "PresenterNear": {
+   "bank": "Ambience",
+   "category": "presence",
+   "length": 8,
+   "loop": true,
+   "start": 177.0
+  },
+  "PresenterStatic": {
+   "bank": "Ambience",
+   "category": "presence",
+   "length": 4,
+   "loop": true,
+   "start": 187.0
+  },
+  "PresenterStep": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.264989,
+   "loop": false,
+   "start": 103.121111
+  },
+  "PresenterVanish": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.8,
+   "loop": false,
+   "start": 104.8861
+  },
+  "PromptHold": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.02,
+   "loop": false,
+   "start": 106.1861
+  },
+  "RadioBed": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 4,
+   "loop": true,
+   "start": 193.0
+  },
+  "RadioIn": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.18,
+   "loop": false,
+   "start": 106.7061
+  },
+  "RadioOut": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.12,
+   "loop": false,
+   "start": 107.3861
+  },
+  "Ready": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.25,
+   "loop": false,
+   "start": 108.0061
+  },
+  "RecBeep": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.18,
+   "loop": false,
+   "start": 108.7561
+  },
+  "Reentry": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.43542,
+   "loop": false,
+   "start": 109.4361
+  },
+  "Relay": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.3,
+   "loop": false,
+   "start": 113.371519
+  },
+  "ReportKey": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.08,
+   "loop": false,
+   "start": 114.171519
+  },
+  "ReportStamp": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.625079,
+   "loop": false,
+   "start": 114.751519
+  },
+  "RewardTick": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.3,
+   "loop": false,
+   "start": 115.876599
+  },
+  "Rewind": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.0,
+   "loop": false,
+   "start": 116.676599
+  },
+  "ShelfCreak": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.711429,
+   "loop": false,
+   "start": 119.176599
+  },
+  "SignalLost": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.1,
+   "loop": false,
+   "start": 122.388027
+  },
+  "StaticLong": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 2.6,
+   "loop": false,
+   "start": 125.988027
+  },
+  "StaticShort": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.35,
+   "loop": false,
+   "start": 129.088027
+  },
+  "Step_carpet_1": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.16161,
+   "loop": false,
+   "start": 129.938027
+  },
+  "Step_carpet_2": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.154422,
+   "loop": false,
+   "start": 130.599637
+  },
+  "Step_carpet_3": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.152041,
+   "loop": false,
+   "start": 131.254059
+  },
+  "Step_carpet_4": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.158957,
+   "loop": false,
+   "start": 131.9061
+  },
+  "Step_concrete_1": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.148798,
+   "loop": false,
+   "start": 132.565057
+  },
+  "Step_concrete_2": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.132426,
+   "loop": false,
+   "start": 133.213855
+  },
+  "Step_concrete_3": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.137234,
+   "loop": false,
+   "start": 133.846281
+  },
+  "Step_concrete_4": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.132222,
+   "loop": false,
+   "start": 134.483515
+  },
+  "Step_metal_1": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.295986,
+   "loop": false,
+   "start": 135.115737
+  },
+  "Step_metal_2": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.284739,
+   "loop": false,
+   "start": 135.911723
+  },
+  "Step_metal_3": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.273265,
+   "loop": false,
+   "start": 136.696463
+  },
+  "Step_metal_4": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.287574,
+   "loop": false,
+   "start": 137.469728
+  },
+  "Step_tile_1": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.125238,
+   "loop": false,
+   "start": 138.257302
+  },
+  "Step_tile_2": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.126735,
+   "loop": false,
+   "start": 138.88254
+  },
+  "Step_tile_3": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.124331,
+   "loop": false,
+   "start": 139.509274
+  },
+  "Step_tile_4": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.119932,
+   "loop": false,
+   "start": 140.133605
+  },
+  "StingDiscovery": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 2.74551,
+   "loop": false,
+   "start": 140.753537
+  },
+  "StingFail": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 5.481111,
+   "loop": false,
+   "start": 143.999048
+  },
+  "StingScare": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 2.470907,
+   "loop": false,
+   "start": 149.980159
+  },
+  "StingSuccess": {
+   "bank": "Sfx",
+   "category": "sting",
+   "length": 4.717868,
+   "loop": false,
+   "start": 152.951066
+  },
+  "TapeEject": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.8,
+   "loop": false,
+   "start": 158.168934
+  },
+  "TapeFlutter": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 3.106825,
+   "loop": false,
+   "start": 159.468934
+  },
+  "TapeInsert": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 1.5,
+   "loop": false,
+   "start": 163.07576
+  },
+  "TapeScrub": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 2,
+   "loop": true,
+   "start": 199.0
+  },
+  "ToolEquip": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.45,
+   "loop": false,
+   "start": 165.07576
+  },
+  "ToolUnequip": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.3,
+   "loop": false,
+   "start": 166.02576
+  },
+  "TransmitterArmed": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 4.352562,
+   "loop": false,
+   "start": 166.82576
+  },
+  "TransmitterLoop": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 4,
+   "loop": true,
+   "start": 203.0
+  },
+  "TutorialPage": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.35,
+   "loop": false,
+   "start": 171.678322
+  },
+  "UIBack": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.045011,
+   "loop": false,
+   "start": 172.528322
+  },
+  "UIClick": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.05,
+   "loop": false,
+   "start": 173.073333
+  },
+  "UIError": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.28,
+   "loop": false,
+   "start": 173.623333
+  },
+  "UIHover": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.015011,
+   "loop": false,
+   "start": 174.403333
+  },
+  "UINotify": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.299977,
+   "loop": false,
+   "start": 174.918345
+  },
+  "UISlider": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.01,
+   "loop": false,
+   "start": 175.718322
+  },
+  "UIToggle": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 0.07,
+   "loop": false,
+   "start": 176.228322
+  },
+  "Unlock": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 1.441406,
+   "loop": false,
+   "start": 176.798322
+  },
+  "VanDoorSlam": {
+   "bank": "Sfx",
+   "category": "sfx",
+   "length": 0.797868,
+   "loop": false,
+   "start": 178.739728
+  },
+  "VanIdle": {
+   "bank": "Ambience",
+   "category": "ambience",
+   "length": 4,
+   "loop": true,
+   "start": 209.0
+  },
+  "VoteChime": {
+   "bank": "Sfx",
+   "category": "ui",
+   "length": 1.12,
+   "loop": false,
+   "start": 180.037596
+  }
+ }
+}

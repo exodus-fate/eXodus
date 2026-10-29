@@ -24,6 +24,7 @@ local Format = require(Shared.Util.Format)
 
 local State = require(script.Parent.Parent.State)
 local UI = require(script.Parent.Parent.UI.UI)
+local Sound = require(script.Parent.Parent.UI.Sound)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local HUDController = require(script.Parent.HUDController)
 
@@ -45,6 +46,9 @@ local function presenterRoot()
 end
 
 local function setActive(on)
+	if on ~= active then
+		Sound.play(on and "ToolEquip" or "ToolUnequip")
+	end
 	active = on
 	local kind = equipment()
 	viewfinder.Visible = on and kind == "Camcorder"
@@ -90,6 +94,7 @@ local function stepCamcorder()
 		if onScreen and screenPos.Z > 0 and distance < 55 then
 			lastRecord = os.clock()
 			State.action("RecordAnomaly")
+			Sound.play("RecBeep")
 		end
 	end
 end

@@ -30,6 +30,7 @@ local State = require(script.Parent.Parent.State)
 local UI = require(script.Parent.Parent.UI.UI)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local FootageView = require(script.Parent.Parent.UI.FootageView)
+local Sound = require(script.Parent.Parent.UI.Sound)
 
 local DeckController = {}
 
@@ -261,19 +262,19 @@ local function build(playerGui)
 		return UI.button(transport, text, fn, { Size = UDim2.fromOffset(width or 56, 44) })
 	end
 	tbtn("-1s", function()
-		DeckController.seek(session.t - 1)
+		DeckController.step(-1)
 	end)
 	tbtn("<|", function()
-		DeckController.seek(session.t - FRAME)
+		DeckController.step(-FRAME)
 	end)
 	widgets.play = tbtn("PLAY", function()
-		session.playing = not session.playing
+		DeckController.setPlaying(not session.playing)
 	end, 76)
 	tbtn("|>", function()
-		DeckController.seek(session.t + FRAME)
+		DeckController.step(FRAME)
 	end)
 	tbtn("+1s", function()
-		DeckController.seek(session.t + 1)
+		DeckController.step(1)
 	end)
 	widgets.speed = tbtn("1x", function()
 		local i = table.find(SPEEDS, session.speed) or 1
@@ -312,6 +313,7 @@ local function build(playerGui)
 
 	-- Scrubbing
 	local dragging = false
+	local scrubToken = 0
 	local function scrubTo(x)
 		local tape = session and session.tapeId and session.caseDef.tapes[session.tapeId]
 		if not tape then
@@ -319,6 +321,15 @@ local function build(playerGui)
 		end
 		local alpha = math.clamp((x - widgets.scrubber.AbsolutePosition.X) / math.max(1, widgets.scrubber.AbsoluteSize.X), 0, 1)
 		DeckController.seek(alpha * tape.duration)
+		-- The tape whines while it is dragged; it stops shortly after the drag does.
+		Sound.loop("TapeScrub", true)
+		scrubToken += 1
+		local token = scrubToken
+		task.delay(0.2, function()
+			if token == scrubToken then
+				Sound.loop("TapeScrub", false)
+			end
+		end)
 	end
 	widgets.scrubber.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -665,7 +676,7 @@ local function render(dt)
 	if session.playing then
 		session.t = math.min(tape.duration, session.t + dt * session.speed)
 		if session.t >= tape.duration then
-			session.playing = false
+			DeckController.setPlaying(false)
 		end
 	end
 	widgets.play.Text = session.playing and "PAUSE" or "PLAY"
@@ -723,7 +734,30 @@ function DeckController.seek(t)
 	session.t = math.clamp(t, 0, tape.duration)
 end
 
+-- Transport with its sounds: a frame (or second) step, and play/pause.
+function DeckController.step(delta)
+	if not session or not session.tapeId then
+		return
+	end
+	DeckController.seek(session.t + delta)
+	Sound.play("FrameStep")
+end
+
+function DeckController.setPlaying(on)
+	if not session or session.playing == on then
+		return
+	end
+	session.playing = on
+	Sound.play(on and "DeckPlay" or "DeckPause")
+end
+
 function DeckController.selectTape(tapeId)
+	if session.tapeId and session.tapeId ~= tapeId then
+		Sound.play("TapeEject")
+		task.delay(0.6, Sound.play, "TapeInsert")
+	elseif session.tapeId ~= tapeId then
+		Sound.play("TapeInsert")
+	end
 	session.tapeId = tapeId
 	session.t = 0
 	session.selected = nil
@@ -741,6 +775,9 @@ function DeckController.selectTape(tapeId)
 end
 
 function DeckController.selectCamera(cameraId)
+	if session.cameraId ~= cameraId then
+		Sound.play("ChannelSwitch")
+	end
 	session.cameraId = cameraId
 	view:setCamera(cameraId)
 	refreshCameras()
@@ -781,6 +818,7 @@ function DeckController.commit()
 		State.cue:Fire({ cue = "LocalEditCommitted" })
 	else
 		widgets.reason.Text = result.message or "Edit refused."
+		Sound.play("EditRejected")
 	end
 	DeckController.refreshPanel()
 end
@@ -789,6 +827,7 @@ function DeckController.markFrame()
 	if not session or not session.tapeId then
 		return
 	end
+	Sound.play("MarkFrame")
 	local result = State.request("MarkFrame", { tape = session.tapeId, camera = session.cameraId, t = session.t })
 	State.notify:Fire(result.ok and ("Hidden frame marked: " .. (result.message or result.frame or "")) or (result.message or "Nothing unusual."))
 end
@@ -880,11 +919,11 @@ function DeckController.open(opts)
 		end
 		local key = input.KeyCode
 		if key == Enum.KeyCode.Space then
-			session.playing = not session.playing
+			DeckController.setPlaying(not session.playing)
 		elseif key == Enum.KeyCode.Left or key == Enum.KeyCode.DPadLeft then
-			DeckController.seek(session.t - FRAME)
+			DeckController.step(-FRAME)
 		elseif key == Enum.KeyCode.Right or key == Enum.KeyCode.DPadRight then
-			DeckController.seek(session.t + FRAME)
+			DeckController.step(FRAME)
 		elseif key == Enum.KeyCode.ButtonB or key == Enum.KeyCode.Backspace then
 			DeckController.close()
 		else

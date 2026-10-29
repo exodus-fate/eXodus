@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local State = require(script.Parent.Parent.State)
 local UI = require(script.Parent.Parent.UI.UI)
+local Sound = require(script.Parent.Parent.UI.Sound)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
 local KeypadController = {}
@@ -36,13 +37,16 @@ local function submit()
 	message.Text = "..."
 	local result = State.request("SubmitCode", { code = code })
 	if result.ok then
+		Sound.play("KeypadRight")
 		close()
 	else
+		Sound.play("KeypadWrong")
 		message.Text = result.message or "Rejected."
 	end
 end
 
 local function press(key)
+	Sound.play("KeypadPress")
 	if key == "C" then
 		entry = ""
 	elseif key == "OK" then

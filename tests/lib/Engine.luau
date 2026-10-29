@@ -441,6 +441,12 @@ ProxyMT.__newindex = function(proxy, key, value)
 		engine.stored[real][key] = value
 		return
 	end
+	-- GetPropertyChangedSignal listeners (only if someone is listening).
+	local byName = engine.signals[real]
+	local changed = byName and byName["Changed:" .. key]
+	if changed then
+		changed:Fire()
+	end
 	if key == "Parent" and raw ~= nil then
 		engine:signalFor(raw, "ChildAdded"):Fire(proxy)
 		local ancestor = raw

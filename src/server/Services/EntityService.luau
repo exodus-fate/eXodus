@@ -36,6 +36,7 @@ local pathWaypoints = nil
 local pathIndex = 0
 local pathTarget = nil
 local pathBusy = false
+local pathFailedAt = -math.huge
 local lastProgress = { pos = nil, at = 0 }
 local stuckCount = 0
 
@@ -299,6 +300,7 @@ local function computePath(from, to)
 			pathIndex = math.min(2, #pathWaypoints)
 		else
 			pathWaypoints = nil
+			pathFailedAt = os.clock()
 		end
 		pathTarget = to
 		pathBusy = false
@@ -321,7 +323,9 @@ local function followPath(goal, speed)
 			Costs = { Door = 2, LockedDoor = math.huge },
 		})
 	end
-	if not pathTarget or (pathTarget - goal).Magnitude > 5 or not pathWaypoints then
+	local moved = not pathTarget or (pathTarget - goal).Magnitude > 5
+	-- After a failed search, wait a second before trying the same goal again.
+	if moved or (not pathWaypoints and os.clock() - pathFailedAt > 1) then
 		computePath(r.Position, goal)
 	end
 	if pathWaypoints and pathWaypoints[pathIndex] then

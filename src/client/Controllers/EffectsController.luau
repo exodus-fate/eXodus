@@ -20,6 +20,7 @@ local State = require(script.Parent.Parent.State)
 local UI = require(script.Parent.Parent.UI.UI)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local FootageView = require(script.Parent.Parent.UI.FootageView)
+local Sound = require(script.Parent.Parent.UI.Sound)
 
 local EffectsController = {}
 
@@ -350,6 +351,7 @@ local function playFalseSafety()
 		task.delay(3.4, function()
 			conn:Disconnect()
 			view:setTexts({ message = "END OF TRANSMISSION" })
+			Sound.play("EndOfTransmission")
 			view:setActors({})
 			task.delay(1.5, function()
 				TweenService:Create(overlay, TweenInfo.new(1), { BackgroundTransparency = 1 }):Play()

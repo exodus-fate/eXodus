@@ -22,6 +22,7 @@ local Workspace = game:GetService("Workspace")
 local State = require(script.Parent.Parent.State)
 local HUDController = require(script.Parent.HUDController)
 local CameraController = require(script.Parent.CameraController)
+local Sound = require(script.Parent.Parent.UI.Sound)
 
 local InputController = {}
 
@@ -78,6 +79,9 @@ local function ensureBeam()
 end
 
 function InputController.setFlashlight(on)
+	if on ~= flashlight then
+		Sound.play(on and "FlashlightOn" or "FlashlightOff")
+	end
 	flashlight = on
 	ensureBeam()
 	beam.Enabled = on
@@ -157,6 +161,7 @@ local function setupBindings()
 	bind("DA_Inspect", function(inputState)
 		if inputState == Enum.UserInputState.Begin and not blocked() then
 			inspecting = true
+			Sound.play("Inspect")
 		elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 			inspecting = false
 		end
@@ -203,8 +208,12 @@ local function step(dt)
 		end
 		local canSprint = sprinting and moving and stamina > 0 and not blocked() and (not State.inMission() or State.isAlive())
 		if canSprint then
+			local before = stamina
 			stamina = math.max(0, stamina - dt / STAMINA_SECONDS)
 			lastSprintAt = os.clock()
+			if before > 0 and stamina <= 0 then
+				Sound.play("BreathOut") -- winded
+			end
 		elseif os.clock() - lastSprintAt > STAMINA_REGEN_DELAY then
 			stamina = math.min(1, stamina + dt / (STAMINA_SECONDS * 1.3))
 		end

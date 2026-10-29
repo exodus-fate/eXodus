@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 local UI = require(script.Parent.Parent.UI.UI)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Controls = require(script.Parent.Parent.UI.Controls)
+local Sound = require(script.Parent.Parent.UI.Sound)
 
 local PromptController = {}
 
@@ -118,12 +119,26 @@ local function show(prompt, playerGui)
 
 	local entry = { gui = gui, fill = fill, conns = {} }
 	shown[prompt] = entry
+	-- The server rewrites prompts while they are on screen (a door's "Open"
+	-- becomes "Close", the generator moves to its next stage): redraw.
+	for _, prop in { "ActionText", "ObjectText", "HoldDuration", "KeyboardKeyCode", "GamepadKeyCode" } do
+		table.insert(entry.conns, prompt:GetPropertyChangedSignal(prop):Connect(function()
+			if shown[prompt] == entry then
+				task.defer(function()
+					if shown[prompt] == entry then
+						show(prompt, playerGui)
+					end
+				end)
+			end
+		end))
+	end
 	local tween
 	table.insert(entry.conns, prompt.PromptButtonHoldBegan:Connect(function()
 		if tween then
 			tween:Cancel()
 		end
 		fill.Size = UDim2.fromScale(1, 0)
+		Sound.play("PromptHold")
 		tween = TweenService:Create(fill, TweenInfo.new(prompt.HoldDuration, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(1, 1) })
 		tween:Play()
 	end))

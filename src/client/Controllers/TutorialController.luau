@@ -173,10 +173,12 @@ end
 local function build(playerGui)
 	gui = UI.screen("DeadAirTutorial", 60, playerGui)
 	gui.Enabled = false
+	-- Active: the shade swallows clicks so the menu behind it can't be used.
 	local shade = UI.new("Frame", {
 		BackgroundColor3 = Theme.Black,
 		BackgroundTransparency = 0.35,
 		BorderSizePixel = 0,
+		Active = true,
 		Size = UDim2.fromScale(1, 1),
 		Parent = gui,
 	})
@@ -220,6 +222,8 @@ local function build(playerGui)
 	nextButton = UI.button(buttons, "NEXT", function()
 		step(1)
 	end, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 150, 1, 0), TextColor3 = Theme.Accent })
+	nextButton:SetAttribute("ClickSound", "TutorialPage")
+	backButton:SetAttribute("ClickSound", "TutorialPage")
 
 	-- Tip card for in-case hints.
 	tipGui = UI.screen("DeadAirTips", 15, playerGui)

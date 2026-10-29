@@ -4,6 +4,7 @@
 ]]
 
 local Theme = require(script.Parent.Theme)
+local Sound = require(script.Parent.Sound)
 
 local UI = {}
 
@@ -137,12 +138,16 @@ function UI.button(parent, text, onClick, props)
 	end
 	button.MouseEnter:Connect(function()
 		refresh(true)
+		if not button:GetAttribute("Disabled") then
+			Sound.play("UIHover")
+		end
 	end)
 	button.MouseLeave:Connect(function()
 		refresh(false)
 	end)
 	button.SelectionGained:Connect(function()
 		refresh(true)
+		Sound.play("UIHover")
 	end)
 	button.SelectionLost:Connect(function()
 		refresh(false)
@@ -150,8 +155,10 @@ function UI.button(parent, text, onClick, props)
 	if onClick then
 		button.Activated:Connect(function()
 			if button:GetAttribute("Disabled") then
+				Sound.play("UIError")
 				return
 			end
+			Sound.play(button:GetAttribute("ClickSound") or "UIClick")
 			onClick(button)
 		end)
 	end
@@ -220,7 +227,11 @@ function UI.slider(parent, label, value, onChange, opts)
 	local function setFromX(x)
 		local alpha = math.clamp((x - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
 		local raw = min + (max - min) * alpha
-		current = math.clamp(math.floor(raw / step + 0.5) * step, min, max)
+		local snapped = math.clamp(math.floor(raw / step + 0.5) * step, min, max)
+		if snapped ~= current then
+			Sound.play("UISlider")
+		end
+		current = snapped
 		render()
 		onChange(current)
 	end
@@ -231,10 +242,12 @@ function UI.slider(parent, label, value, onChange, opts)
 			setFromX(input.Position.X)
 		elseif input.KeyCode == Enum.KeyCode.DPadRight or input.KeyCode == Enum.KeyCode.Right then
 			current = math.clamp(current + step, min, max)
+			Sound.play("UISlider")
 			render()
 			onChange(current)
 		elseif input.KeyCode == Enum.KeyCode.DPadLeft or input.KeyCode == Enum.KeyCode.Left then
 			current = math.clamp(current - step, min, max)
+			Sound.play("UISlider")
 			render()
 			onChange(current)
 		end
@@ -263,6 +276,7 @@ function UI.toggle(parent, label, value, onChange)
 	end)
 	button.Text = string.format("%s: %s", label, current and "ON" or "OFF")
 	button.TextXAlignment = Enum.TextXAlignment.Left
+	button:SetAttribute("ClickSound", "UIToggle")
 	UI.padding(button, 10, 0)
 	return button
 end

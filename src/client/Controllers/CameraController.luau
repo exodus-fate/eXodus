@@ -139,7 +139,8 @@ end
 ---------------------------------------------------------------------------
 
 local function buildVignette(playerGui)
-	gui = UI.screen("DeadAirVignette", 5, playerGui)
+	-- Below every other screen so it never darkens the HUD text.
+	gui = UI.screen("DeadAirVignette", 1, playerGui)
 	vignetteEdges = {}
 	local function edge(rotation, size, position, anchor)
 		local frame = UI.new("Frame", {

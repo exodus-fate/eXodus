@@ -508,9 +508,12 @@ function MissionService.endMission()
 		return
 	end
 	runId += 1
+	-- Only those still in the case: anyone who left is already back in the
+	-- field office and must not be respawned a second time.
 	local players = {}
 	for _, player in Players:GetPlayers() do
-		if mission:participant(player.UserId) then
+		local p = mission:participant(player.UserId)
+		if p and p.status ~= "Disconnected" then
 			table.insert(players, player)
 		end
 	end
@@ -921,6 +924,11 @@ function MissionService.init(dependencies, remoteTable)
 			end
 		end
 		deps.LobbyService.sendProfile(player)
+	end)
+
+	-- Door sounds for everyone, in the station and the field office alike.
+	table.insert(deps.WorldService.onDoorMoved, function(doorId, open, kind)
+		remotes.Cue:FireAllClients({ cue = "DoorMoved", door = doorId, open = open, kind = kind })
 	end)
 
 	table.insert(deps.WorldService.onReset, function(station)

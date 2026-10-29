@@ -59,6 +59,8 @@ safeInit("Prompts", PromptController.init, playerGui)
 safeInit("Tutorial", TutorialController.init, playerGui)
 
 InputController.onTool = ToolController.toggle
+-- Your footsteps land in time with the head bob.
+CameraController.onFootstep = AudioController.footstep
 
 InputController.onDeck = function()
 	if DeckController.isOpen() then

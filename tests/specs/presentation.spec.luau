@@ -310,6 +310,26 @@ test("interaction prompts are drawn by the game, in its typeface, and go away", 
 		e:signalFor(prompt, "PromptButtonHoldBegan"):Fire()
 	end)
 	e:advance(0.1)
+	-- The server rewrites the prompt while it is shown: the card follows.
+	e:run("server", function()
+		e:wrap(prompt).ActionText = "Eject tape"
+	end)
+	e:advance(0.1)
+	local redrawn = playerGui(env):FindFirstChild("DeadAirPrompt")
+	local found = false
+	for _, d in redrawn:GetDescendants() do
+		if d.ClassName == "TextLabel" and d.Text == "EJECT TAPE" then
+			found = true
+		end
+	end
+	expect(found).toBe(true)
+	local cards = 0
+	for _, c in playerGui(env):GetChildren() do
+		if c.Name == "DeadAirPrompt" then
+			cards += 1
+		end
+	end
+	expect(cards).toBe(1)
 	e:spawnOnSide("client", function()
 		e:signalFor(pps, "PromptHidden"):Fire(e:wrap(prompt))
 	end)

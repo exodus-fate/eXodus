@@ -246,6 +246,19 @@ function WorldService.setDoorLocked(doorId, locked)
 	updateModifiers(entry)
 end
 
+-- Called with (doorId, open, kind) whenever a door actually moves, so every
+-- client can play its sound where it is.
+WorldService.onDoorMoved = {}
+
+local function doorMoved(doorId, entry)
+	for _, fn in WorldService.onDoorMoved do
+		local ok, err = pcall(fn, doorId, entry.open, entry.kind)
+		if not ok then
+			warn("[WorldService] door listener failed: " .. tostring(err))
+		end
+	end
+end
+
 function WorldService.openDoor(doorId)
 	local entry = WorldService.doors[doorId]
 	if not entry or entry.locked or entry.open or #entry.panels == 0 then
@@ -253,6 +266,7 @@ function WorldService.openDoor(doorId)
 	end
 	moveDoor(entry, true)
 	updateModifiers(entry)
+	doorMoved(doorId, entry)
 	return true
 end
 
@@ -263,6 +277,7 @@ function WorldService.closeDoor(doorId)
 	end
 	moveDoor(entry, false)
 	updateModifiers(entry)
+	doorMoved(doorId, entry)
 	return true
 end
 
