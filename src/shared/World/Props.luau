@@ -1,10 +1,19 @@
 --[[
-	Reusable prop builders. Practical, boxy 1990s broadcast shapes with readable
-	silhouettes and low part counts. Every builder takes a CFrame for the prop's
-	floor-level origin (or a surface point, as noted) and parents into `parent`.
+	Reusable prop builders. Practical 1990s broadcast equipment and office
+	furniture: readable silhouettes first, then surface detail (drawer fronts,
+	vents, seams, screws, labels, cables) so close up they read as real objects.
+	Every part is made of a named surface from Shared.Config.Surfaces (wood
+	veneer, painted steel, beige vinyl casing, rubber, leather...), which picks
+	the physically based Roblox material and a little colour variation.
+
+	Every builder takes a CFrame for the prop's floor-level origin (or a surface
+	point, as noted) and parents into `parent`. Collision stays on the main
+	bodies; detail parts never collide.
 ]]
 
 local MapLayout = require(script.Parent.Parent.Config.MapLayout)
+local Surfaces = require(script.Parent.Parent.Config.Surfaces)
+local Typeface = require(script.Parent.Parent.Config.Typeface)
 
 local Props = {}
 
@@ -20,7 +29,8 @@ end
 Props.rgb = rgb
 
 --[[
-	opts: material, transparency, collide (default true), shadow (default true),
+	opts: surface (a Surfaces.List name), material (overrides the surface),
+	      transparency, collide (default true), shadow (default true),
 	      shape ("Block" | "Cylinder" | "Ball"), anchored (default true)
 ]]
 function Props.part(parent, name, size, cframe, colour, opts)
@@ -32,8 +42,19 @@ function Props.part(parent, name, size, cframe, colour, opts)
 	p.Anchored = opts.anchored ~= false
 	p.CanCollide = opts.collide ~= false
 	p.CastShadow = opts.shadow ~= false
-	p.Material = opts.material or Enum.Material.SmoothPlastic
-	p.Color = typeof(colour) == "Color3" and colour or Props.colour(colour or "grey")
+	local c = typeof(colour) == "Color3" and colour or Props.colour(colour or "grey")
+	if opts.surface then
+		local surface = Surfaces.get(opts.surface)
+		p.Material = opts.material or Enum.Material[surface.material]
+		c = Surfaces.vary(c, surface.vary, cframe.Position)
+		local variant = Surfaces.variantFor(opts.surface)
+		if variant and not opts.material then
+			p.MaterialVariant = variant
+		end
+	else
+		p.Material = opts.material or Enum.Material.SmoothPlastic
+	end
+	p.Color = c
 	p.Transparency = opts.transparency or 0
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
@@ -66,7 +87,7 @@ function Props.label(target, text, opts)
 	label.Size = UDim2.fromScale(1, 1)
 	label.Text = text
 	label.TextScaled = true
-	label.FontFace = Font.fromEnum(opts.font or Enum.Font.Code)
+	label.FontFace = opts.bold and Typeface.bold() or Typeface.medium()
 	label.TextColor3 = opts.textColour or Color3.fromRGB(30, 30, 26)
 	label.TextWrapped = true
 	label.Parent = gui
@@ -88,42 +109,133 @@ function Props.weld(a, b)
 	return w
 end
 
+-- Small non-colliding detail on a surface.
+local function detail(parent, name, size, cf, colour, surface, opts)
+	opts = opts or {}
+	opts.collide = false
+	opts.shadow = opts.shadow == true
+	opts.surface = surface or "bareMetal"
+	return part(parent, name, size, cf, colour, opts)
+end
+Props.detail = detail
+
+-- Negative amounts lighten.
+local function darker(colour, amount)
+	local c = typeof(colour) == "Color3" and colour or Props.colour(colour)
+	local out = c:Lerp(Color3.new(0, 0, 0), amount)
+	return Color3.new(math.min(out.R, 1), math.min(out.G, 1), math.min(out.B, 1))
+end
+Props.darker = darker
+
+-- A row of screw heads along a line (a -> b, local to cf).
+local function screws(parent, cf, a, b, count)
+	for i = 0, count - 1 do
+		local t = count == 1 and 0.5 or i / (count - 1)
+		detail(parent, "Screw", Vector3.new(0.09, 0.09, 0.03), cf * CFrame.new(a:Lerp(b, t)), Color3.fromRGB(150, 148, 140), "bareMetal")
+	end
+end
+Props.screws = screws
+
+-- Horizontal vent slots on a face: centre cf (facing -Z), area w x h.
+local function vents(parent, cf, w, h, count)
+	for i = 1, count do
+		local y = -h / 2 + (i - 0.5) * (h / count)
+		detail(parent, "Vent", Vector3.new(w, math.min(0.06, h / count * 0.45), 0.03), cf * CFrame.new(0, y, 0), Color3.fromRGB(16, 16, 15), "blackPlastic")
+	end
+end
+Props.vents = vents
+
 ---------------------------------------------------------------------------
 -- Furniture
 ---------------------------------------------------------------------------
 
+-- Office desk: veneer top with an edge band, a drawer pedestal (front, local
+-- -Z) and a recessed kneehole. Collision is the original solid body.
 function Props.desk(parent, cf, w, d, h, colour)
 	local m = Props.model(parent, "Desk")
 	h = h or 3.2
-	part(m, "Top", Vector3.new(w, 0.25, d), cf * CFrame.new(0, h - 0.125, 0), colour or "brown", { material = Enum.Material.Wood })
-	part(m, "Body", Vector3.new(w - 0.2, h - 0.25, d - 0.4), cf * CFrame.new(0, (h - 0.25) / 2, 0.1), colour or "brownDark", { material = Enum.Material.Wood })
+	local top = colour or "brown"
+	part(m, "Top", Vector3.new(w, 0.25, d), cf * CFrame.new(0, h - 0.125, 0), top, { surface = "veneer" })
+	detail(m, "EdgeBand", Vector3.new(w + 0.02, 0.1, d + 0.02), cf * CFrame.new(0, h - 0.2, 0), darker(top, 0.35), "veneer")
+	local bodyColour = colour and darker(colour, 0.2) or "brownDark"
+	part(m, "Body", Vector3.new(w - 0.2, h - 0.25, d - 0.4), cf * CFrame.new(0, (h - 0.25) / 2, 0.1), bodyColour, { surface = "veneer" })
+	local front = -(d - 0.4) / 2 + 0.1 - 0.02
+	-- Kneehole: a dark recess between the pedestals.
+	local knee = math.max(1.6, w * 0.45)
+	detail(m, "Kneehole", Vector3.new(knee, h - 0.6, 0.04), cf * CFrame.new(-w * 0.12, (h - 0.6) / 2, front), Color3.fromRGB(14, 12, 10), "blackPlastic")
+	-- Drawer pedestal.
+	local pw = math.min(1.8, w * 0.28)
+	local px = w / 2 - 0.1 - pw / 2 - 0.15
+	local drawers = 3
+	local dh = (h - 0.55) / drawers
+	for i = 1, drawers do
+		local y = 0.15 + (i - 0.5) * dh
+		detail(m, "Drawer" .. i, Vector3.new(pw, dh - 0.08, 0.05), cf * CFrame.new(px, y, front - 0.01), darker(bodyColour, -0.08), "veneer")
+		detail(m, "Handle" .. i, Vector3.new(pw * 0.35, 0.07, 0.08), cf * CFrame.new(px, y + dh * 0.2, front - 0.06), Color3.fromRGB(170, 166, 150), "bareMetal")
+	end
+	-- Kick plate.
+	detail(m, "Plinth", Vector3.new(w - 0.25, 0.14, 0.05), cf * CFrame.new(0, 0.07, front - 0.01), Color3.fromRGB(26, 24, 22), "rubber")
 	return m
 end
 
+-- Swivel office chair: upholstered seat and back, gas lift, five-star base.
 function Props.chair(parent, cf, colour)
 	local m = Props.model(parent, "Chair")
-	part(m, "Seat", Vector3.new(1.8, 0.4, 1.8), cf * CFrame.new(0, 1.7, 0), colour or "blueDark", { material = Enum.Material.Fabric })
-	part(m, "Back", Vector3.new(1.8, 2, 0.3), cf * CFrame.new(0, 2.9, 0.8), colour or "blueDark", { material = Enum.Material.Fabric })
-	part(m, "Post", Vector3.new(0.3, 1.5, 0.3), cf * CFrame.new(0, 0.75, 0), "greyDark", { material = Enum.Material.Metal, collide = false })
-	part(m, "Base", Vector3.new(1.6, 0.2, 1.6), cf * CFrame.new(0, 0.1, 0), "black", { collide = false })
+	local fabric = colour or "blueDark"
+	part(m, "Seat", Vector3.new(1.8, 0.4, 1.8), cf * CFrame.new(0, 1.7, 0), fabric, { surface = "upholstery" })
+	detail(m, "SeatPan", Vector3.new(1.6, 0.12, 1.6), cf * CFrame.new(0, 1.46, 0), Color3.fromRGB(28, 28, 26), "blackPlastic")
+	part(m, "Back", Vector3.new(1.8, 2, 0.3), cf * CFrame.new(0, 2.9, 0.8), fabric, { surface = "upholstery" })
+	detail(m, "BackShell", Vector3.new(1.7, 1.9, 0.08), cf * CFrame.new(0, 2.9, 0.98), Color3.fromRGB(28, 28, 26), "blackPlastic")
+	detail(m, "Spine", Vector3.new(0.25, 1.1, 0.14), cf * CFrame.new(0, 1.85, 0.95), Color3.fromRGB(40, 40, 38), "bareMetal")
+	for _, side in { -1, 1 } do
+		detail(m, "Armrest", Vector3.new(0.22, 0.14, 1.2), cf * CFrame.new(side * 0.98, 2.35, 0.05), Color3.fromRGB(30, 30, 28), "blackPlastic")
+		detail(m, "ArmPost", Vector3.new(0.16, 0.55, 0.16), cf * CFrame.new(side * 0.98, 2.02, 0.3), Color3.fromRGB(30, 30, 28), "blackPlastic")
+	end
+	part(m, "Post", Vector3.new(0.3, 1.5, 0.3), cf * CFrame.new(0, 0.75, 0), "greyDark", { surface = "bareMetal", collide = false })
+	part(m, "Base", Vector3.new(1.6, 0.2, 1.6), cf * CFrame.new(0, 0.1, 0), "black", { collide = false, surface = "blackPlastic", transparency = 1, shadow = false })
+	for i = 0, 4 do
+		local a = math.rad(i * 72)
+		local arm = cf * CFrame.Angles(0, a, 0)
+		detail(m, "Leg", Vector3.new(0.2, 0.14, 1), arm * CFrame.new(0, 0.2, -0.5), Color3.fromRGB(30, 30, 28), "blackPlastic")
+		detail(m, "Castor", Vector3.new(0.22, 0.22, 0.22), arm * CFrame.new(0, 0.11, -0.95), Color3.fromRGB(20, 20, 20), "rubber", { shape = Enum.PartType.Ball })
+	end
 	return m
 end
 
 function Props.bench(parent, cf, length)
 	local m = Props.model(parent, "Bench")
-	part(m, "Seat", Vector3.new(length, 0.4, 1.6), cf * CFrame.new(0, 1.6, 0), "brown", { material = Enum.Material.Wood })
-	part(m, "Back", Vector3.new(length, 1.8, 0.3), cf * CFrame.new(0, 2.6, 0.7), "brown", { material = Enum.Material.Wood })
-	part(m, "Legs", Vector3.new(length - 0.4, 1.4, 1.2), cf * CFrame.new(0, 0.7, 0), "greyDark", { material = Enum.Material.Metal })
+	local slats = 4
+	part(m, "Seat", Vector3.new(length, 0.4, 1.6), cf * CFrame.new(0, 1.6, 0), "brown", { surface = "planks", transparency = 1, shadow = false })
+	for i = 1, slats do
+		detail(m, "SeatSlat", Vector3.new(length, 0.16, 0.34), cf * CFrame.new(0, 1.7, -0.6 + (i - 1) * 0.4), "brown", "veneer", { shadow = true })
+	end
+	part(m, "Back", Vector3.new(length, 1.8, 0.3), cf * CFrame.new(0, 2.6, 0.7), "brown", { surface = "veneer", transparency = 1, shadow = false })
+	for i = 1, 3 do
+		detail(m, "BackSlat", Vector3.new(length, 0.32, 0.12), cf * CFrame.new(0, 2.05 + i * 0.42, 0.72), "brown", "veneer", { shadow = true })
+	end
+	part(m, "Legs", Vector3.new(length - 0.4, 1.4, 1.2), cf * CFrame.new(0, 0.7, 0), "greyDark", { surface = "paintedMetal", transparency = 1, shadow = false })
+	for _, x in { -1, 1 } do
+		local lx = x * (length / 2 - 0.5)
+		detail(m, "Frame", Vector3.new(0.18, 1.5, 1.3), cf * CFrame.new(lx, 0.8, 0), Color3.fromRGB(44, 44, 42), "paintedMetal", { shadow = true })
+		detail(m, "Upright", Vector3.new(0.18, 1.6, 0.18), cf * CFrame.new(lx, 2.4, 0.8), Color3.fromRGB(44, 44, 42), "paintedMetal", { shadow = true })
+	end
 	return m
 end
 
+-- Steel filing cabinet with drawer seams, pulls and label holders.
 function Props.cabinet(parent, cf, w, h, d, colour)
 	local m = Props.model(parent, "Cabinet")
-	part(m, "Body", Vector3.new(w, h, d), cf * CFrame.new(0, h / 2, 0), colour or "grey", { material = Enum.Material.Metal })
+	local body = colour or "grey"
+	part(m, "Body", Vector3.new(w, h, d), cf * CFrame.new(0, h / 2, 0), body, { surface = "paintedMetal" })
 	local drawers = math.max(1, math.floor(h / 1.2))
+	local dh = h / drawers
 	for i = 1, drawers do
-		part(m, "Handle" .. i, Vector3.new(w * 0.4, 0.12, 0.1), cf * CFrame.new(0, (i - 0.5) * (h / drawers), -d / 2 - 0.05), "greyDark", { collide = false, shadow = false })
+		local y = (i - 0.5) * dh
+		detail(m, "Front" .. i, Vector3.new(w - 0.16, dh - 0.08, 0.04), cf * CFrame.new(0, y, -d / 2 - 0.02), darker(body, -0.06), "paintedMetal")
+		detail(m, "Handle" .. i, Vector3.new(w * 0.4, 0.12, 0.1), cf * CFrame.new(0, y - dh * 0.1, -d / 2 - 0.07), Color3.fromRGB(168, 164, 156), "bareMetal")
+		detail(m, "LabelHolder" .. i, Vector3.new(w * 0.24, 0.22, 0.03), cf * CFrame.new(0, y + dh * 0.22, -d / 2 - 0.05), Color3.fromRGB(214, 206, 180), "paper")
 	end
+	detail(m, "Plinth", Vector3.new(w - 0.05, 0.12, d - 0.05), cf * CFrame.new(0, 0.06, 0), Color3.fromRGB(26, 26, 24), "rubber")
 	return m
 end
 
@@ -134,11 +246,18 @@ function Props.shelf(parent, cf, length, height, depth, levels, colour)
 	levels = levels or { 0.4, 2.5, 4.1, 5.7 }
 	colour = colour or "greyDark"
 	for _, side in { -1, 1 } do
-		part(m, "Upright", Vector3.new(0.25, height, depth), cf * CFrame.new(side * (length / 2 - 0.125), height / 2, 0), colour, { material = Enum.Material.Metal })
+		part(m, "Upright", Vector3.new(0.25, height, depth), cf * CFrame.new(side * (length / 2 - 0.125), height / 2, 0), colour, { surface = "paintedMetal" })
+		-- Slotted holes down each upright.
+		for y = 0.6, height - 0.4, 0.8 do
+			detail(m, "Slot", Vector3.new(0.27, 0.18, 0.08), cf * CFrame.new(side * (length / 2 - 0.125), y, -depth / 2 + 0.2), Color3.fromRGB(16, 16, 15), "blackPlastic")
+		end
 	end
 	for i, top in levels do
-		part(m, "Board" .. i, Vector3.new(length, 0.15, depth), cf * CFrame.new(0, top - 0.075, 0), colour, { material = Enum.Material.Metal })
+		part(m, "Board" .. i, Vector3.new(length, 0.15, depth), cf * CFrame.new(0, top - 0.075, 0), colour, { surface = "paintedMetal" })
+		detail(m, "Lip" .. i, Vector3.new(length - 0.5, 0.2, 0.05), cf * CFrame.new(0, top - 0.12, -depth / 2 - 0.02), darker(colour, 0.15), "paintedMetal")
 	end
+	-- Cross brace at the back.
+	detail(m, "Brace", Vector3.new(math.sqrt(length * length + height * height) * 0.92, 0.12, 0.06), cf * CFrame.new(0, height / 2, depth / 2 - 0.05) * CFrame.Angles(0, 0, math.atan2(height, length)), darker(colour, 0.1), "paintedMetal")
 	return m
 end
 
@@ -147,25 +266,55 @@ function Props.tapeRow(parent, cf, length, colourKeys)
 	local count = math.floor(length / 0.6)
 	for i = 1, count do
 		local key = colourKeys[(i % #colourKeys) + 1]
-		part(parent, "Spine", Vector3.new(0.45, 1.1, 1.3), cf * CFrame.new(-length / 2 + (i - 0.5) * 0.6, 0.55, 0), key, { collide = false, shadow = false, material = Enum.Material.Plastic })
+		-- Slight lean and depth jitter, so the row looks handled.
+		local jitter = math.sin(i * 12.9898) * 0.06
+		local spineCf = cf * CFrame.new(-length / 2 + (i - 0.5) * 0.6, 0.55, jitter) * CFrame.Angles(0, 0, jitter * 0.6)
+		part(parent, "Spine", Vector3.new(0.45, 1.1, 1.3), spineCf, key, { collide = false, shadow = false, surface = "cardboard" })
+		detail(parent, "SpineLabel", Vector3.new(0.02, 0.5, 0.9), spineCf * CFrame.new(-0.235, 0.1, 0), Color3.fromRGB(214, 206, 178), "paper")
 	end
 end
 
 function Props.plant(parent, cf)
 	local m = Props.model(parent, "Plant")
-	part(m, "Pot", Vector3.new(1.4, 1.4, 1.4), cf * CFrame.new(0, 0.7, 0), "brownDark", { material = Enum.Material.Slate })
-	part(m, "Leaves", Vector3.new(2.2, 2.6, 2.2), cf * CFrame.new(0, 2.6, 0), "greenDark", { material = Enum.Material.Grass, collide = false })
+	part(m, "Pot", Vector3.new(1.4, 1.4, 1.4), cf * CFrame.new(0, 0.7, 0), "brownDark", { surface = "pottery" })
+	detail(m, "Rim", Vector3.new(1.55, 0.18, 1.55), cf * CFrame.new(0, 1.35, 0), darker("brownDark", -0.1), "pottery")
+	detail(m, "Soil", Vector3.new(1.25, 0.06, 1.25), cf * CFrame.new(0, 1.38, 0), Color3.fromRGB(40, 32, 24), "ground")
+	part(m, "Leaves", Vector3.new(2.4, 2.4, 2.4), cf * CFrame.new(0, 2.6, 0), "greenDark", { surface = "foliage", collide = false, shape = Enum.PartType.Ball })
+	-- Dying: a few drooping brown leaves.
+	for i = 1, 3 do
+		local a = math.rad(i * 120 + 20)
+		detail(m, "DeadLeaf", Vector3.new(0.5, 0.06, 1.1), cf * CFrame.Angles(0, a, 0) * CFrame.new(0, 1.6, -1) * CFrame.Angles(math.rad(-30), 0, 0), Color3.fromRGB(110, 92, 56), "foliage")
+	end
 	return m
 end
 
+-- Cardboard archive box or wooden crate depending on size.
 function Props.crate(parent, cf, size)
-	return part(parent, "Crate", size, cf * CFrame.new(0, size.Y / 2, 0), "brown", { material = Enum.Material.WoodPlanks })
+	if size.X <= 2.5 then
+		local m = Props.model(parent, "Crate")
+		local box = part(m, "Box", size, cf * CFrame.new(0, size.Y / 2, 0), Color3.fromRGB(150, 122, 86), { surface = "cardboard" })
+		detail(m, "Lid", Vector3.new(size.X + 0.08, 0.3, size.Z + 0.08), cf * CFrame.new(0, size.Y - 0.15, 0), Color3.fromRGB(160, 132, 94), "cardboard")
+		detail(m, "Tape", Vector3.new(0.35, 0.3, size.Z + 0.1), cf * CFrame.new(0, size.Y - 0.149, 0), Color3.fromRGB(176, 150, 100), "foil")
+		detail(m, "Label", Vector3.new(size.X * 0.5, size.Y * 0.25, 0.02), cf * CFrame.new(0, size.Y * 0.5, -size.Z / 2 - 0.02), Color3.fromRGB(220, 212, 186), "paper")
+		m.PrimaryPart = box
+		return box
+	end
+	local box = part(parent, "Crate", size, cf * CFrame.new(0, size.Y / 2, 0), "brown", { surface = "planks" })
+	for _, y in { 0.15, size.Y - 0.15 } do
+		detail(parent, "Batten", Vector3.new(size.X + 0.06, 0.25, size.Z + 0.06), cf * CFrame.new(0, y, 0), darker("brown", 0.2), "planks")
+	end
+	return box
 end
 
 function Props.extinguisher(parent, cf)
 	local m = Props.model(parent, "Extinguisher")
-	part(m, "Body", Vector3.new(0.7, 1.8, 0.7), cf * CFrame.new(0, 1.4, 0), "warning", { collide = false })
-	part(m, "Bracket", Vector3.new(0.9, 0.2, 0.3), cf * CFrame.new(0, 2.3, 0.3), "greyDark", { collide = false })
+	part(m, "Body", Vector3.new(1.8, 0.7, 0.7), cf * CFrame.new(0, 1.4, 0) * CFrame.Angles(0, 0, math.rad(90)), "warning", { collide = false, surface = "enamel", shape = Enum.PartType.Cylinder })
+	detail(m, "Dome", Vector3.new(0.7, 0.7, 0.7), cf * CFrame.new(0, 2.3, 0), "warning", "enamel", { shape = Enum.PartType.Ball })
+	detail(m, "Valve", Vector3.new(0.22, 0.3, 0.22), cf * CFrame.new(0, 2.7, 0), Color3.fromRGB(40, 40, 38), "bareMetal")
+	detail(m, "Handle", Vector3.new(0.5, 0.08, 0.14), cf * CFrame.new(0.15, 2.82, 0), Color3.fromRGB(40, 40, 38), "bareMetal")
+	detail(m, "Hose", Vector3.new(0.12, 1.1, 0.12), cf * CFrame.new(0.42, 2.2, -0.12) * CFrame.Angles(0, 0, math.rad(-12)), Color3.fromRGB(18, 18, 18), "rubber")
+	detail(m, "Instructions", Vector3.new(0.5, 0.6, 0.02), cf * CFrame.new(0, 1.5, -0.36), Color3.fromRGB(220, 214, 190), "paper")
+	part(m, "Bracket", Vector3.new(0.9, 0.2, 0.3), cf * CFrame.new(0, 2.3, 0.3), "greyDark", { collide = false, surface = "paintedMetal" })
 	return m
 end
 
@@ -174,22 +323,38 @@ function Props.pipe(parent, a, b, radius, colour)
 	local length = (b - a).Magnitude
 	local mid = (a + b) / 2
 	local cf = CFrame.lookAt(mid, b) * CFrame.Angles(0, math.rad(90), 0)
-	return part(parent, "Pipe", Vector3.new(length, radius * 2, radius * 2), cf, colour or "greyDark", {
+	-- No shadow: pipes run right past the ceiling fixtures and would throw
+	-- room-sized shadows.
+	local p = part(parent, "Pipe", Vector3.new(length, radius * 2, radius * 2), cf, colour or "greyDark", {
 		shape = Enum.PartType.Cylinder,
-		material = Enum.Material.Metal,
+		surface = "paintedMetal",
 		collide = false,
+		shadow = false,
 	})
+	-- Flanged joints every few studs.
+	local joints = math.floor(length / 8)
+	for i = 1, joints do
+		local t = i / (joints + 1)
+		detail(parent, "Flange", Vector3.new(0.25, radius * 2.6, radius * 2.6), cf * CFrame.new(-length / 2 + length * t, 0, 0), darker(p.Color, 0.1), "rust", { shape = Enum.PartType.Cylinder })
+	end
+	return p
 end
 
 function Props.poster(parent, cf, w, h, text, colour)
-	local p = part(parent, "Poster", Vector3.new(w, h, 0.05), cf, colour or "cream", { collide = false, shadow = false, material = Enum.Material.Cardboard })
+	local p = part(parent, "Poster", Vector3.new(w, h, 0.05), cf, colour or "cream", { collide = false, shadow = false, surface = "paper" })
 	Props.label(p, text, { textColour = Color3.fromRGB(60, 54, 44), pixelsPerStud = 30 })
+	-- Curling corner and pins.
+	detail(parent, "Curl", Vector3.new(w * 0.14, h * 0.1, 0.04), cf * CFrame.new(w * 0.43, -h * 0.45, -0.05) * CFrame.Angles(math.rad(-25), 0, math.rad(20)), darker(p.Color, 0.12), "paper")
+	for _, x in { -1, 1 } do
+		detail(parent, "Pin", Vector3.new(0.1, 0.1, 0.06), cf * CFrame.new(x * (w / 2 - 0.15), h / 2 - 0.15, -0.05), Color3.fromRGB(150, 40, 34), "enamel")
+	end
 	return p
 end
 
 function Props.sign(parent, cf, w, h, text, colour, textColour)
-	local p = part(parent, "Sign", Vector3.new(w, h, 0.1), cf, colour or "creamDark", { collide = false, shadow = false })
-	Props.label(p, text, { textColour = textColour or Color3.fromRGB(34, 34, 30), pixelsPerStud = 30 })
+	local p = part(parent, "Sign", Vector3.new(w, h, 0.1), cf, colour or "creamDark", { collide = false, shadow = false, surface = "enamel" })
+	Props.label(p, text, { textColour = textColour or Color3.fromRGB(34, 34, 30), pixelsPerStud = 30, bold = true })
+	screws(parent, cf * CFrame.new(0, 0, -0.06), Vector3.new(-w / 2 + 0.15, 0, 0), Vector3.new(w / 2 - 0.15, 0, 0), 2)
 	return p
 end
 
@@ -202,58 +367,110 @@ function Props.crt(parent, cf, scale, name)
 	scale = scale or 1
 	local m = Props.model(parent, name or "CRT")
 	local w, h, d = 2.2 * scale, 1.9 * scale, 2 * scale
-	part(m, "Casing", Vector3.new(w, h, d), cf * CFrame.new(0, h / 2, 0.15 * scale), "cream", { material = Enum.Material.Plastic })
-	part(m, "Bezel", Vector3.new(w * 0.92, h * 0.86, 0.1), cf * CFrame.new(0, h / 2, -d / 2 + 0.1 * scale), "creamDark", { collide = false })
+	part(m, "Casing", Vector3.new(w, h, d), cf * CFrame.new(0, h / 2, 0.15 * scale), "cream", { surface = "vinylCasing" })
+	-- The tube's tapered back.
+	detail(m, "Neck", Vector3.new(w * 0.62, h * 0.66, d * 0.5), cf * CFrame.new(0, h * 0.48, 0.15 * scale + d * 0.62), darker("cream", 0.08), "vinylCasing", { shadow = true })
+	part(m, "Bezel", Vector3.new(w * 0.92, h * 0.86, 0.1), cf * CFrame.new(0, h / 2, -d / 2 + 0.1 * scale), "creamDark", { collide = false, surface = "vinylCasing" })
 	local screen = part(m, "Screen", Vector3.new(w * 0.78, h * 0.68, 0.06), cf * CFrame.new(0, h / 2 + 0.04 * scale, -d / 2 + 0.03 * scale), "black", {
 		collide = false,
 		shadow = false,
-		material = Enum.Material.Glass,
+		surface = "screen",
 	})
-	part(m, "KnobA", Vector3.new(0.2, 0.2, 0.1), cf * CFrame.new(w * 0.4, h * 0.15, -d / 2 + 0.05), "greyDark", { collide = false, shadow = false })
+	-- Control strip under the screen: knobs, power button and a badge.
+	local stripY = h * 0.1
+	for i, x in { 0.28, 0.36 } do
+		detail(m, "Knob" .. i, Vector3.new(0.08 * scale, 0.16 * scale, 0.16 * scale), cf * CFrame.new(w * x, stripY, -d / 2 + 0.06) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(40, 38, 34), "blackPlastic", { shape = Enum.PartType.Cylinder })
+	end
+	detail(m, "Power", Vector3.new(0.14 * scale, 0.1 * scale, 0.04), cf * CFrame.new(w * 0.42, stripY, -d / 2 + 0.06), Color3.fromRGB(60, 58, 52), "blackPlastic")
+	detail(m, "Badge", Vector3.new(0.4 * scale, 0.07 * scale, 0.03), cf * CFrame.new(-w * 0.3, stripY, -d / 2 + 0.06), Color3.fromRGB(150, 146, 136), "foil")
+	vents(m, cf * CFrame.new(0, h + 0.005, 0.15 * scale) * CFrame.Angles(math.rad(-90), 0, 0), w * 0.6, d * 0.6, 6)
 	return m, screen
 end
 
 -- Tape deck (VCR). cf is the bottom-centre; the slot faces -Z.
 function Props.vcr(parent, cf, colour)
 	local m = Props.model(parent, "TapeDeck")
-	part(m, "Body", Vector3.new(2.6, 0.6, 1.8), cf * CFrame.new(0, 0.3, 0), colour or "greyDark", { material = Enum.Material.Metal })
-	part(m, "Slot", Vector3.new(1.6, 0.12, 0.05), cf * CFrame.new(-0.3, 0.38, -0.91), "black", { collide = false, shadow = false })
+	part(m, "Body", Vector3.new(2.6, 0.6, 1.8), cf * CFrame.new(0, 0.3, 0), colour or "greyDark", { surface = "paintedMetal" })
+	detail(m, "Fascia", Vector3.new(2.56, 0.5, 0.04), cf * CFrame.new(0, 0.3, -0.9), Color3.fromRGB(26, 26, 25), "blackPlastic")
+	part(m, "Slot", Vector3.new(1.6, 0.12, 0.05), cf * CFrame.new(-0.3, 0.38, -0.91), "black", { collide = false, shadow = false, surface = "blackPlastic" })
+	detail(m, "SlotFlap", Vector3.new(1.5, 0.08, 0.02), cf * CFrame.new(-0.3, 0.39, -0.94), Color3.fromRGB(40, 40, 38), "blackPlastic")
+	-- Green fluorescent clock display.
+	local display = detail(m, "Display", Vector3.new(0.6, 0.14, 0.02), cf * CFrame.new(-0.3, 0.2, -0.93), Color3.fromRGB(60, 120, 90), "glass")
+	display.Transparency = 0.1
 	for i = 0, 3 do
-		part(m, "Button" .. i, Vector3.new(0.18, 0.12, 0.05), cf * CFrame.new(0.75 + i * 0.22, 0.22, -0.91), "creamDark", { collide = false, shadow = false })
+		part(m, "Button" .. i, Vector3.new(0.18, 0.12, 0.05), cf * CFrame.new(0.75 + i * 0.22, 0.22, -0.91), "creamDark", { collide = false, shadow = false, surface = "blackPlastic" })
 	end
 	local led = part(m, "StatusLED", Vector3.new(0.12, 0.08, 0.05), cf * CFrame.new(0.9, 0.42, -0.91), Color3.fromRGB(120, 200, 120), {
 		collide = false,
 		shadow = false,
-		material = Enum.Material.Neon,
+		surface = "glow",
 	})
+	for _, x in { -1.1, 1.1 } do
+		detail(m, "Foot", Vector3.new(0.3, 0.06, 0.3), cf * CFrame.new(x, 0.03, 0.6), Color3.fromRGB(16, 16, 16), "rubber")
+	end
 	return m, led
 end
 
 function Props.beigeComputer(parent, cf)
 	local m = Props.model(parent, "Computer")
-	part(m, "Tower", Vector3.new(2, 0.7, 1.8), cf * CFrame.new(0, 0.35, 0), "cream", { material = Enum.Material.Plastic })
+	part(m, "Tower", Vector3.new(2, 0.7, 1.8), cf * CFrame.new(0, 0.35, 0), "cream", { surface = "vinylCasing" })
+	detail(m, "DriveBay", Vector3.new(0.7, 0.12, 0.03), cf * CFrame.new(-0.4, 0.45, -0.91), Color3.fromRGB(150, 142, 120), "vinylCasing")
+	detail(m, "FloppySlot", Vector3.new(0.5, 0.03, 0.02), cf * CFrame.new(-0.4, 0.45, -0.93), Color3.fromRGB(20, 20, 18), "blackPlastic")
+	detail(m, "PowerLED", Vector3.new(0.06, 0.06, 0.02), cf * CFrame.new(0.7, 0.45, -0.92), Color3.fromRGB(90, 190, 90), "glow")
 	local _, screen = Props.crt(m, cf * CFrame.new(0, 0.7, 0), 0.8, "Monitor")
-	part(m, "Keyboard", Vector3.new(1.8, 0.12, 0.7), cf * CFrame.new(0, 0.06, -1.5), "creamDark", { collide = false })
+	part(m, "Keyboard", Vector3.new(1.8, 0.12, 0.7), cf * CFrame.new(0, 0.06, -1.5), "creamDark", { collide = false, surface = "vinylCasing" })
+	-- Key rows.
+	for row = 0, 3 do
+		detail(m, "Keys", Vector3.new(1.55 - row * 0.05, 0.05, 0.12), cf * CFrame.new(0, 0.14, -1.74 + row * 0.15), Color3.fromRGB(176, 168, 146), "vinylCasing")
+	end
+	detail(m, "Cable", Vector3.new(0.05, 0.05, 0.9), cf * CFrame.new(0.2, 0.03, -0.9), Color3.fromRGB(150, 142, 120), "rubber")
 	return m, screen
 end
 
 function Props.mixingConsole(parent, cf, w)
 	local m = Props.model(parent, "Console")
-	part(m, "Base", Vector3.new(w, 2.8, 2.6), cf * CFrame.new(0, 1.4, 0), "greyDark", { material = Enum.Material.Metal })
-	local slope = part(m, "Panel", Vector3.new(w, 0.3, 2.4), cf * CFrame.new(0, 3, -0.1) * CFrame.Angles(math.rad(-12), 0, 0), "black", { material = Enum.Material.Metal })
+	part(m, "Base", Vector3.new(w, 2.8, 2.6), cf * CFrame.new(0, 1.4, 0), "greyDark", { surface = "paintedMetal" })
+	detail(m, "Kick", Vector3.new(w - 0.1, 0.25, 0.04), cf * CFrame.new(0, 0.12, -1.31), Color3.fromRGB(18, 18, 18), "rubber")
+	local slope = part(m, "Panel", Vector3.new(w, 0.3, 2.4), cf * CFrame.new(0, 3, -0.1) * CFrame.Angles(math.rad(-12), 0, 0), "black", { surface = "paintedMetal" })
+	detail(m, "Armrest", Vector3.new(w, 0.22, 0.4), cf * CFrame.new(0, 2.92, -1.38), Color3.fromRGB(34, 26, 20), "leather", { shadow = true })
 	local faders = math.floor(w / 0.6)
 	for i = 1, faders do
-		part(m, "Fader", Vector3.new(0.18, 0.15, 0.5), slope.CFrame * CFrame.new(-w / 2 + (i - 0.5) * 0.6, 0.2, ((i % 3) - 1) * 0.3), "creamDark", { collide = false, shadow = false })
+		local x = -w / 2 + (i - 0.5) * 0.6
+		detail(m, "Track", Vector3.new(0.06, 0.02, 0.9), slope.CFrame * CFrame.new(x, 0.16, 0.25), Color3.fromRGB(10, 10, 10), "blackPlastic")
+		part(m, "Fader", Vector3.new(0.18, 0.15, 0.2), slope.CFrame * CFrame.new(x, 0.2, ((i % 3) - 1) * 0.3 + 0.25), "creamDark", { collide = false, shadow = false, surface = "vinylCasing" })
+		for k = 0, 2 do
+			detail(m, "Pot", Vector3.new(0.12, 0.12, 0.12), slope.CFrame * CFrame.new(x, 0.2, -0.45 - k * 0.25), k == 0 and Color3.fromRGB(160, 50, 40) or Color3.fromRGB(70, 70, 66), "blackPlastic", { shape = Enum.PartType.Ball })
+		end
+	end
+	-- Meter bridge.
+	detail(m, "MeterBridge", Vector3.new(w, 0.5, 0.3), slope.CFrame * CFrame.new(0, 0.4, 1.1), Color3.fromRGB(24, 24, 22), "paintedMetal", { shadow = true })
+	for i = 1, math.max(2, math.floor(w / 1.5)) do
+		detail(m, "VUMeter", Vector3.new(0.5, 0.3, 0.02), slope.CFrame * CFrame.new(-w / 2 + (i - 0.5) * 1.5, 0.42, 0.94), Color3.fromRGB(220, 190, 120), "glass")
 	end
 	return m
 end
 
 function Props.equipmentRack(parent, cf, h, name)
 	local m = Props.model(parent, name or "Rack")
-	part(m, "Frame", Vector3.new(2.4, h, 2.2), cf * CFrame.new(0, h / 2, 0), "black", { material = Enum.Material.Metal })
+	part(m, "Frame", Vector3.new(2.4, h, 2.2), cf * CFrame.new(0, h / 2, 0), "black", { surface = "paintedMetal" })
 	local units = math.floor((h - 0.6) / 0.9)
 	for i = 1, units do
-		part(m, "Unit" .. i, Vector3.new(2.1, 0.7, 0.1), cf * CFrame.new(0, 0.5 + (i - 0.5) * 0.9, -1.12), i % 2 == 0 and "greyDark" or "grey", { collide = false, shadow = false })
+		local y = 0.5 + (i - 0.5) * 0.9
+		local colour = i % 2 == 0 and "greyDark" or "grey"
+		part(m, "Unit" .. i, Vector3.new(2.1, 0.7, 0.1), cf * CFrame.new(0, y, -1.12), colour, { collide = false, shadow = false, surface = "bareMetal" })
+		screws(m, cf * CFrame.new(0, y, -1.18), Vector3.new(-0.95, 0, 0), Vector3.new(0.95, 0, 0), 2)
+		if i % 3 == 1 then
+			vents(m, cf * CFrame.new(-0.2, y, -1.18), 1.2, 0.5, 4)
+		else
+			for k = 0, 2 do
+				detail(m, "Switch", Vector3.new(0.1, 0.14, 0.06), cf * CFrame.new(0.3 + k * 0.2, y, -1.2), Color3.fromRGB(26, 26, 24), "blackPlastic")
+			end
+			detail(m, "Lamp", Vector3.new(0.08, 0.08, 0.04), cf * CFrame.new(-0.7, y, -1.19), i % 4 == 0 and Color3.fromRGB(200, 70, 50) or Color3.fromRGB(90, 160, 90), "glow")
+		end
+	end
+	-- Cable loom out of the top.
+	for k = -1, 1 do
+		detail(m, "Cable", Vector3.new(0.14, 1.4, 0.14), cf * CFrame.new(k * 0.4, h + 0.7, 0.6), Color3.fromRGB(20, 20, 20), "rubber")
 	end
 	return m
 end
@@ -261,12 +478,15 @@ end
 function Props.cctvCamera(parent, position, look, cameraId)
 	local m = Props.model(parent, cameraId)
 	local cf = CFrame.lookAt(position, look)
-	part(m, "Housing", Vector3.new(0.7, 0.6, 1.4), cf, "cream", { collide = false })
-	part(m, "Lens", Vector3.new(0.4, 0.4, 0.2), cf * CFrame.new(0, 0, -0.75), "black", { collide = false, shadow = false, material = Enum.Material.Glass })
+	part(m, "Housing", Vector3.new(0.7, 0.6, 1.4), cf, "cream", { collide = false, surface = "paintedMetal" })
+	detail(m, "Hood", Vector3.new(0.8, 0.08, 1.6), cf * CFrame.new(0, 0.34, -0.1), "cream", "paintedMetal", { shadow = true })
+	part(m, "Lens", Vector3.new(0.4, 0.4, 0.2), cf * CFrame.new(0, 0, -0.75), "black", { collide = false, shadow = false, surface = "glass" })
+	detail(m, "Mount", Vector3.new(0.18, 0.18, 0.9), cf * CFrame.new(0, -0.1, 0.9), Color3.fromRGB(60, 60, 58), "paintedMetal")
+	detail(m, "Cable", Vector3.new(0.08, 0.08, 1.2), cf * CFrame.new(0.2, -0.2, 1.2), Color3.fromRGB(18, 18, 18), "rubber")
 	local led = part(m, "Tally", Vector3.new(0.1, 0.1, 0.1), cf * CFrame.new(0.25, 0.25, -0.7), Color3.fromRGB(150, 40, 30), {
 		collide = false,
 		shadow = false,
-		material = Enum.Material.Neon,
+		surface = "glow",
 	})
 	led:SetAttribute("TallyLight", true)
 	m:SetAttribute("CameraId", cameraId)
@@ -275,10 +495,28 @@ end
 
 function Props.generator(parent, cf)
 	local m = Props.model(parent, "Generator")
-	part(m, "Body", Vector3.new(12, 6, 6), cf * CFrame.new(0, 3.4, 0), "greenDark", { material = Enum.Material.Metal })
-	part(m, "Skid", Vector3.new(13, 0.4, 7), cf * CFrame.new(0, 0.2, 0), "black", { material = Enum.Material.Metal })
-	part(m, "Exhaust", Vector3.new(1, 5, 1), cf * CFrame.new(4.5, 8.5, 1.5), "greyDark", { material = Enum.Material.CorrodedMetal, collide = false })
-	part(m, "Panel", Vector3.new(3, 2.2, 0.3), cf * CFrame.new(-3, 3.8, -3.15), "cream", { collide = false })
+	part(m, "Body", Vector3.new(12, 6, 6), cf * CFrame.new(0, 3.4, 0), "greenDark", { surface = "paintedMetal" })
+	part(m, "Skid", Vector3.new(13, 0.4, 7), cf * CFrame.new(0, 0.2, 0), "black", { surface = "rust" })
+	-- Cylinders run along X, so the upright exhaust stack is turned on its end.
+	part(m, "Exhaust", Vector3.new(5, 1, 1), cf * CFrame.new(4.5, 8.5, 1.5) * CFrame.Angles(0, 0, math.rad(90)), "greyDark", { surface = "rust", collide = false, shape = Enum.PartType.Cylinder })
+	detail(m, "RainCap", Vector3.new(0.3, 1.4, 1.4), cf * CFrame.new(4.5, 11.1, 1.5) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(50, 46, 42), "rust", { shape = Enum.PartType.Cylinder, shadow = true })
+	part(m, "Panel", Vector3.new(3, 2.2, 0.3), cf * CFrame.new(-3, 3.8, -3.15), "cream", { collide = false, surface = "paintedMetal" })
+	screws(m, cf * CFrame.new(-3, 3.8, -3.32), Vector3.new(-1.35, 0.95, 0), Vector3.new(1.35, 0.95, 0), 4)
+	screws(m, cf * CFrame.new(-3, 3.8, -3.32), Vector3.new(-1.35, -0.95, 0), Vector3.new(1.35, -0.95, 0), 4)
+	-- Gauges and a warning plate.
+	for i = 0, 1 do
+		detail(m, "Gauge" .. i, Vector3.new(0.08, 0.6, 0.6), cf * CFrame.new(-3.8 + i * 0.8, 3.3, -3.34) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(220, 214, 196), "glass", { shape = Enum.PartType.Cylinder })
+	end
+	local warning = detail(m, "WarningPlate", Vector3.new(2.4, 0.8, 0.04), cf * CFrame.new(2, 5.2, -3.02), Color3.fromRGB(200, 160, 40), "enamel")
+	Props.label(warning, "DANGER · HIGH VOLTAGE", { textColour = Color3.fromRGB(30, 26, 20), pixelsPerStud = 40, bold = true })
+	-- Access door seams and hinges along the body.
+	for i = 0, 2 do
+		local x = -1 + i * 3
+		detail(m, "DoorSeam", Vector3.new(0.05, 5, 0.03), cf * CFrame.new(x, 3.4, -3.02), Color3.fromRGB(20, 26, 20), "blackPlastic")
+		detail(m, "Latch", Vector3.new(0.12, 0.4, 0.08), cf * CFrame.new(x + 1.3, 3.6, -3.05), Color3.fromRGB(150, 146, 136), "bareMetal")
+	end
+	-- Oil stain under the skid.
+	detail(m, "OilStain", Vector3.new(5, 0.02, 3.2), cf * CFrame.new(1, 0.42, 0.6), Color3.fromRGB(14, 14, 12), "rubber", { transparency = 0.35 })
 	local lamps = {}
 	for i, name in { "Unpowered", "Primed", "Powered" } do
 		local lamp = part(m, "Lamp" .. name, Vector3.new(0.35, 0.35, 0.1), cf * CFrame.new(-4.1 + i * 0.55, 4.5, -3.35), "greyDark", {
@@ -290,7 +528,7 @@ function Props.generator(parent, cf)
 		lamps[i] = lamp
 	end
 	for i = 1, 4 do
-		part(m, "Fin" .. i, Vector3.new(0.2, 4.5, 5.6), cf * CFrame.new(1 + i * 0.9, 3.4, 0), "black", { collide = false, shadow = false })
+		part(m, "Fin" .. i, Vector3.new(0.2, 4.5, 5.6), cf * CFrame.new(1 + i * 0.9, 3.4, 0), "black", { collide = false, shadow = false, surface = "paintedMetal" })
 	end
 	return m
 end
@@ -300,44 +538,57 @@ function Props.cage(parent, cf)
 	local w, h, d = 4.5, 7, 4
 	for _, x in { -1, 1 } do
 		for _, z in { -1, 1 } do
-			part(m, "Post", Vector3.new(0.2, h, 0.2), cf * CFrame.new(x * w / 2, h / 2, z * d / 2), "greyDark", { material = Enum.Material.Metal })
+			part(m, "Post", Vector3.new(0.2, h, 0.2), cf * CFrame.new(x * w / 2, h / 2, z * d / 2), "greyDark", { surface = "paintedMetal" })
 		end
 	end
-	local meshOpts = { material = Enum.Material.DiamondPlate, transparency = 0.55 }
+	local meshOpts = { surface = "mesh", transparency = 0.55 }
 	part(m, "MeshBack", Vector3.new(w, h, 0.1), cf * CFrame.new(0, h / 2, d / 2), "grey", meshOpts)
 	part(m, "MeshLeft", Vector3.new(0.1, h, d), cf * CFrame.new(-w / 2, h / 2, 0), "grey", meshOpts)
 	part(m, "MeshRight", Vector3.new(0.1, h, d), cf * CFrame.new(w / 2, h / 2, 0), "grey", meshOpts)
 	local door = part(m, "MeshDoor", Vector3.new(w, h, 0.1), cf * CFrame.new(0, h / 2, -d / 2), "grey", meshOpts)
 	door:SetAttribute("CageDoor", true)
 	part(m, "Roof", Vector3.new(w, 0.1, d), cf * CFrame.new(0, h, 0), "grey", meshOpts)
-	part(m, "Shelf", Vector3.new(w - 0.4, 0.15, d - 0.4), cf * CFrame.new(0, 3.2, 0), "greyDark", { material = Enum.Material.Metal })
-	local keypad = part(m, "Keypad", Vector3.new(0.8, 1.1, 0.25), cf * CFrame.new(w / 2 + 0.6, 4, -d / 2), "greyDark", { collide = false })
+	part(m, "Shelf", Vector3.new(w - 0.4, 0.15, d - 0.4), cf * CFrame.new(0, 3.2, 0), "greyDark", { surface = "paintedMetal" })
+	local keypad = part(m, "Keypad", Vector3.new(0.8, 1.1, 0.25), cf * CFrame.new(w / 2 + 0.6, 4, -d / 2), "greyDark", { collide = false, surface = "paintedMetal" })
 	Props.label(keypad, "1 2 3\n4 5 6\n7 8 9\n  0  ", { textColour = Color3.fromRGB(150, 210, 160), lightInfluence = 0, pixelsPerStud = 50 })
+	detail(m, "Conduit", Vector3.new(0.1, 4, 0.1), cf * CFrame.new(w / 2 + 0.6, 6.5, -d / 2 + 0.1), Color3.fromRGB(80, 80, 76), "bareMetal")
 	return m
 end
 
 function Props.relayBox(parent, cf, label)
 	local m = Props.model(parent, "Relay")
-	part(m, "Box", Vector3.new(2.2, 2.8, 0.8), cf, "grey", { material = Enum.Material.Metal })
+	part(m, "Box", Vector3.new(2.2, 2.8, 0.8), cf, "grey", { surface = "paintedMetal" })
+	detail(m, "DoorSeam", Vector3.new(2, 2.6, 0.03), cf * CFrame.new(0, 0, -0.41), darker("grey", -0.05), "paintedMetal")
+	detail(m, "Hinge", Vector3.new(0.1, 2.4, 0.1), cf * CFrame.new(-1.05, 0, -0.42), Color3.fromRGB(150, 146, 136), "bareMetal")
+	detail(m, "Lock", Vector3.new(0.18, 0.18, 0.18), cf * CFrame.new(0.85, 0, -0.45), Color3.fromRGB(170, 160, 120), "bareMetal", { shape = Enum.PartType.Ball })
 	local lamp = part(m, "Lamp", Vector3.new(0.4, 0.4, 0.1), cf * CFrame.new(0.6, 0.8, -0.45), Color3.fromRGB(120, 200, 120), {
 		collide = false,
 		shadow = false,
-		material = Enum.Material.Neon,
+		surface = "glow",
 	})
 	lamp:SetAttribute("RelayLamp", true)
-	local plate = part(m, "Plate", Vector3.new(1.6, 0.5, 0.05), cf * CFrame.new(-0.2, -0.6, -0.42), "cream", { collide = false, shadow = false })
-	Props.label(plate, label, { pixelsPerStud = 40 })
+	local plate = part(m, "Plate", Vector3.new(1.6, 0.5, 0.05), cf * CFrame.new(-0.2, -0.6, -0.42), "cream", { collide = false, shadow = false, surface = "enamel" })
+	Props.label(plate, label, { pixelsPerStud = 40, bold = true })
+	detail(m, "Conduit", Vector3.new(0.2, 3, 0.2), cf * CFrame.new(0, 2.9, 0), Color3.fromRGB(90, 90, 86), "bareMetal")
 	return m
 end
 
 function Props.transmitter(parent, cf)
 	local m = Props.model(parent, "Transmitter")
-	part(m, "Cabinet", Vector3.new(14, 14, 10), cf * CFrame.new(0, 7, 0), "greyDark", { material = Enum.Material.Metal })
-	part(m, "Upper", Vector3.new(9, 8, 7), cf * CFrame.new(0, 18, 0), "black", { material = Enum.Material.Metal })
-	part(m, "Mast", Vector3.new(1.4, 4, 1.4), cf * CFrame.new(0, 24, 0), "grey", { material = Enum.Material.Metal, collide = false })
+	part(m, "Cabinet", Vector3.new(14, 14, 10), cf * CFrame.new(0, 7, 0), "greyDark", { surface = "paintedMetal" })
+	part(m, "Upper", Vector3.new(9, 8, 7), cf * CFrame.new(0, 18, 0), "black", { surface = "paintedMetal" })
+	part(m, "Mast", Vector3.new(1.4, 4, 1.4), cf * CFrame.new(0, 24, 0), "grey", { surface = "bareMetal", collide = false })
 	for i = 1, 5 do
-		part(m, "Vent" .. i, Vector3.new(11, 0.4, 0.1), cf * CFrame.new(0, 2 + i * 2, -5.05), "black", { collide = false, shadow = false })
+		part(m, "Vent" .. i, Vector3.new(11, 0.4, 0.1), cf * CFrame.new(0, 2 + i * 2, -5.05), "black", { collide = false, shadow = false, surface = "blackPlastic" })
 	end
+	-- Valve windows: rows of glass portholes over the tube bays.
+	for i = 0, 3 do
+		detail(m, "Porthole", Vector3.new(0.1, 1.1, 1.1), cf * CFrame.new(-4.5 + i * 3, 13, -5.06) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(60, 70, 66), "glass", { shape = Enum.PartType.Cylinder })
+	end
+	screws(m, cf * CFrame.new(0, 0.6, -5.08), Vector3.new(-6.6, 0, 0), Vector3.new(6.6, 0, 0), 8)
+	screws(m, cf * CFrame.new(0, 13.6, -5.08), Vector3.new(-6.6, 0, 0), Vector3.new(6.6, 0, 0), 8)
+	local plate = detail(m, "Nameplate", Vector3.new(4, 0.9, 0.05), cf * CFrame.new(0, 1.4, -5.08), Color3.fromRGB(170, 150, 100), "foil")
+	Props.label(plate, "CH-0 TRANSMITTER · 25 kW", { textColour = Color3.fromRGB(40, 30, 20), pixelsPerStud = 30, bold = true })
 	local status = part(m, "StatusLamp", Vector3.new(0.8, 0.8, 0.8), cf * CFrame.new(0, 14.6, -3.6), Color3.fromRGB(70, 30, 26), {
 		collide = false,
 		shadow = false,
@@ -349,17 +600,43 @@ end
 
 function Props.van(parent, cf)
 	local m = Props.model(parent, "ExtractionVan")
-	part(m, "Body", Vector3.new(7.5, 6.5, 15), cf * CFrame.new(0, 4.2, 0), "cream", { material = Enum.Material.Metal })
-	part(m, "Cab", Vector3.new(7.5, 4.5, 3.5), cf * CFrame.new(0, 3.2, -9), "cream", { material = Enum.Material.Metal })
-	part(m, "Windscreen", Vector3.new(6.8, 2, 0.1), cf * CFrame.new(0, 4.4, -10.8), "blueDark", { material = Enum.Material.Glass, transparency = 0.3, collide = false })
-	part(m, "Stripe", Vector3.new(7.6, 0.6, 15.1), cf * CFrame.new(0, 4.4, 0), "blue", { collide = false, shadow = false })
+	part(m, "Body", Vector3.new(7.5, 6.5, 15), cf * CFrame.new(0, 4.2, 0), "cream", { surface = "paintedMetal" })
+	part(m, "Cab", Vector3.new(7.5, 4.5, 3.5), cf * CFrame.new(0, 3.2, -9), "cream", { surface = "paintedMetal" })
+	detail(m, "Bonnet", Vector3.new(7.3, 0.4, 3.2), cf * CFrame.new(0, 5.4, -9.4) * CFrame.Angles(math.rad(-8), 0, 0), darker("cream", 0.05), "paintedMetal", { shadow = true })
+	part(m, "Windscreen", Vector3.new(6.8, 2, 0.1), cf * CFrame.new(0, 4.4, -10.8), "blueDark", { surface = "glass", transparency = 0.3, collide = false })
+	part(m, "Stripe", Vector3.new(7.6, 0.6, 15.1), cf * CFrame.new(0, 4.4, 0), "blue", { collide = false, shadow = false, surface = "enamel" })
+	-- Front: grille, headlights, bumper and plate.
+	detail(m, "Grille", Vector3.new(3.4, 1.2, 0.05), cf * CFrame.new(0, 2.6, -10.78), Color3.fromRGB(30, 30, 28), "bareMetal")
+	for _, x in { -2.8, 2.8 } do
+		detail(m, "Headlight", Vector3.new(0.1, 0.9, 0.9), cf * CFrame.new(x, 2.7, -10.78) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(210, 206, 186), "glass", { shape = Enum.PartType.Cylinder })
+		detail(m, "Mirror", Vector3.new(0.6, 0.9, 0.12), cf * CFrame.new(x * 1.42, 5, -9.9), Color3.fromRGB(30, 30, 28), "blackPlastic", { shadow = true })
+		detail(m, "SideWindow", Vector3.new(0.05, 1.6, 2.2), cf * CFrame.new(x * 1.34, 4.4, -9.2), Color3.fromRGB(46, 56, 64), "glass")
+	end
+	detail(m, "Bumper", Vector3.new(7.8, 0.6, 0.5), cf * CFrame.new(0, 1.5, -10.95), Color3.fromRGB(110, 110, 106), "bareMetal", { shadow = true })
+	detail(m, "RearBumper", Vector3.new(7.8, 0.6, 0.5), cf * CFrame.new(0, 1.5, 7.75), Color3.fromRGB(110, 110, 106), "bareMetal", { shadow = true })
+	local plate = detail(m, "Plate", Vector3.new(1.8, 0.45, 0.04), cf * CFrame.new(0, 1.55, -11.22), Color3.fromRGB(226, 220, 196), "enamel")
+	Props.label(plate, "NBR 04K", { textColour = Color3.fromRGB(20, 20, 20), pixelsPerStud = 50, bold = true })
+	-- Panel seams, a sliding-door track and road grime along the sills.
+	for _, side in { -1, 1 } do
+		for _, z in { -3, 3 } do
+			detail(m, "Seam", Vector3.new(0.03, 5.6, 0.05), cf * CFrame.new(side * 3.77, 4.3, z), darker("cream", 0.25), "paintedMetal")
+		end
+		detail(m, "DoorTrack", Vector3.new(0.08, 0.1, 9), cf * CFrame.new(side * 3.8, 6.6, 0), Color3.fromRGB(60, 60, 58), "bareMetal")
+		detail(m, "Grime", Vector3.new(0.03, 1.1, 15), cf * CFrame.new(side * 3.77, 1.5, 0), Color3.fromRGB(70, 62, 50), "concrete", { transparency = 0.35 })
+	end
 	for _, x in { -3.4, 3.4 } do
 		for _, z in { -8, 5 } do
-			part(m, "Wheel", Vector3.new(1, 2.2, 2.2), cf * CFrame.new(x, 1.1, z), "black", { shape = Enum.PartType.Cylinder, material = Enum.Material.Rubber })
+			part(m, "Wheel", Vector3.new(1, 2.2, 2.2), cf * CFrame.new(x, 1.1, z), "black", { shape = Enum.PartType.Cylinder, surface = "rubber" })
+			detail(m, "Hubcap", Vector3.new(0.08, 1.1, 1.1), cf * CFrame.new(x + (x > 0 and 0.52 or -0.52), 1.1, z), Color3.fromRGB(150, 150, 146), "bareMetal", { shape = Enum.PartType.Cylinder })
+			detail(m, "Arch", Vector3.new(0.3, 0.4, 2.8), cf * CFrame.new(x * 1.03, 2.35, z), Color3.fromRGB(26, 26, 24), "rubber")
 		end
 	end
-	local doors = part(m, "RearDoors", Vector3.new(7, 6, 0.2), cf * CFrame.new(0, 4.2, 7.6), "creamDark", { material = Enum.Material.Metal })
-	Props.label(doors, "NBRD · MOBILE UNIT 4", { textColour = Color3.fromRGB(60, 70, 80), face = Enum.NormalId.Back, pixelsPerStud = 20 })
+	local doors = part(m, "RearDoors", Vector3.new(7, 6, 0.2), cf * CFrame.new(0, 4.2, 7.6), "creamDark", { surface = "paintedMetal" })
+	Props.label(doors, "NBRD · MOBILE UNIT 4", { textColour = Color3.fromRGB(60, 70, 80), face = Enum.NormalId.Back, pixelsPerStud = 20, bold = true })
+	detail(m, "DoorSplit", Vector3.new(0.05, 6, 0.05), cf * CFrame.new(0, 4.2, 7.72), darker("creamDark", 0.3), "paintedMetal")
+	for _, x in { -0.4, 0.4 } do
+		detail(m, "DoorHandle", Vector3.new(0.12, 0.6, 0.12), cf * CFrame.new(x, 4.2, 7.76), Color3.fromRGB(150, 150, 146), "bareMetal")
+	end
 	-- Small monitor inside the rear doors: the false-safety beat plays on it.
 	local _, screen = Props.crt(m, cf * CFrame.new(2.2, 3, 6.6) * CFrame.Angles(0, math.rad(180), 0), 0.7, "VanMonitor")
 	screen:AddTag("CCTVMonitor")
@@ -370,9 +647,15 @@ end
 
 function Props.floodlight(parent, cf, colour)
 	local m = Props.model(parent, "Floodlight")
-	part(m, "Pole", Vector3.new(0.5, 14, 0.5), cf * CFrame.new(0, 7, 0), "greyDark", { material = Enum.Material.Metal })
+	part(m, "Pole", Vector3.new(0.5, 14, 0.5), cf * CFrame.new(0, 7, 0), "greyDark", { surface = "paintedMetal" })
+	for i = 0, 2 do
+		local a = math.rad(i * 120)
+		detail(m, "TripodLeg", Vector3.new(0.18, 3.4, 0.18), cf * CFrame.Angles(0, a, 0) * CFrame.new(0, 1.4, -0.9) * CFrame.Angles(math.rad(-35), 0, 0), Color3.fromRGB(44, 44, 42), "paintedMetal", { shadow = true })
+	end
+	detail(m, "Housing", Vector3.new(2.3, 1.3, 1.2), cf * CFrame.new(0, 14, 0.1), Color3.fromRGB(40, 40, 38), "paintedMetal", { shadow = true })
+	detail(m, "Cable", Vector3.new(0.12, 13, 0.12), cf * CFrame.new(0.35, 7, 0.2), Color3.fromRGB(18, 18, 18), "rubber")
 	local head = part(m, "Head", Vector3.new(2, 1, 1), cf * CFrame.new(0, 14, -0.5), colour or Color3.fromRGB(230, 200, 150), {
-		material = Enum.Material.Neon,
+		surface = "glow",
 		collide = false,
 		shadow = false,
 	})
@@ -391,9 +674,21 @@ end
 
 function Props.studioCamera(parent, cf)
 	local m = Props.model(parent, "StudioCamera")
-	part(m, "Tripod", Vector3.new(1.6, 4.4, 1.6), cf * CFrame.new(0, 2.2, 0), "black", { material = Enum.Material.Metal })
-	part(m, "Body", Vector3.new(1.4, 1.5, 2.6), cf * CFrame.new(0, 5.1, 0), "greyDark", { material = Enum.Material.Metal })
-	part(m, "Lens", Vector3.new(0.8, 0.8, 0.8), cf * CFrame.new(0, 5.1, -1.6), "black", { collide = false, material = Enum.Material.Glass })
+	part(m, "Tripod", Vector3.new(1.6, 4.4, 1.6), cf * CFrame.new(0, 2.2, 0), "black", { surface = "paintedMetal", transparency = 1, shadow = false })
+	detail(m, "Column", Vector3.new(0.4, 4.2, 0.4), cf * CFrame.new(0, 2.3, 0), Color3.fromRGB(40, 40, 38), "bareMetal", { shadow = true })
+	for i = 0, 2 do
+		local a = math.rad(i * 120)
+		detail(m, "Leg", Vector3.new(0.2, 0.2, 1.6), cf * CFrame.Angles(0, a, 0) * CFrame.new(0, 0.3, -0.7), Color3.fromRGB(30, 30, 28), "paintedMetal", { shadow = true })
+		detail(m, "Wheel", Vector3.new(0.2, 0.4, 0.4), cf * CFrame.Angles(0, a, 0) * CFrame.new(0, 0.2, -1.45), Color3.fromRGB(16, 16, 16), "rubber", { shape = Enum.PartType.Cylinder })
+	end
+	part(m, "Body", Vector3.new(1.4, 1.5, 2.6), cf * CFrame.new(0, 5.1, 0), "greyDark", { surface = "paintedMetal" })
+	part(m, "Lens", Vector3.new(0.8, 0.8, 0.8), cf * CFrame.new(0, 5.1, -1.6), "black", { collide = false, surface = "glass", shape = Enum.PartType.Ball })
+	detail(m, "LensBarrel", Vector3.new(1, 0.9, 0.9), cf * CFrame.new(0, 5.1, -1.6) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(24, 24, 22), "blackPlastic", { shape = Enum.PartType.Cylinder, shadow = true })
+	detail(m, "Viewfinder", Vector3.new(0.9, 0.7, 0.8), cf * CFrame.new(0, 6.1, 0.6), Color3.fromRGB(34, 34, 32), "blackPlastic", { shadow = true })
+	for _, x in { -1, 1 } do
+		detail(m, "PanBar", Vector3.new(0.12, 0.12, 1.8), cf * CFrame.new(x * 0.5, 4.6, 1.8) * CFrame.Angles(math.rad(-20), 0, 0), Color3.fromRGB(40, 40, 38), "bareMetal")
+	end
+	detail(m, "Tally", Vector3.new(0.15, 0.15, 0.05), cf * CFrame.new(0, 5.75, -1.31), Color3.fromRGB(140, 40, 30), "glow")
 	return m
 end
 
@@ -402,9 +697,11 @@ function Props.wallClock(parent, cf, time)
 	local face = part(m, "Face", Vector3.new(0.15, 2, 2), cf * CFrame.Angles(0, math.rad(90), 0), "cream", {
 		shape = Enum.PartType.Cylinder,
 		collide = false,
+		surface = "enamel",
 	})
+	detail(m, "Rim", Vector3.new(0.2, 2.2, 2.2), cf * CFrame.new(0, 0, 0.04) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(30, 30, 28), "blackPlastic", { shape = Enum.PartType.Cylinder })
 	-- Rotating a cylinder 90 degrees about Y points its +X (Right) disc along -Z.
-	local _, text = Props.label(face, time or "", { textColour = Color3.fromRGB(40, 40, 36), face = Enum.NormalId.Right, pixelsPerStud = 40 })
+	local _, text = Props.label(face, time or "", { textColour = Color3.fromRGB(40, 40, 36), face = Enum.NormalId.Right, pixelsPerStud = 40, bold = true })
 	text.Name = "Time"
 	return m, text
 end

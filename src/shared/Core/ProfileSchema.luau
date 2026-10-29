@@ -32,6 +32,14 @@ ProfileSchema.DefaultSettings = {
 	ambience = 0.8,
 	effects = 1,
 	textScale = 1,
+	-- Camera and comfort
+	fieldOfView = 70,
+	headBob = 1,
+	motionBlur = 1,
+	vignette = 1,
+	toggleSprint = false,
+	crosshair = true,
+	tips = true,
 }
 
 local SETTING_RANGES = {
@@ -44,6 +52,10 @@ local SETTING_RANGES = {
 	ambience = { 0, 1 },
 	effects = { 0, 1 },
 	textScale = { 0.8, 1.4 },
+	fieldOfView = { 60, 90 },
+	headBob = { 0, 1 },
+	motionBlur = { 0, 1 },
+	vignette = { 0, 1 },
 }
 
 local function deepCopy(value)
@@ -78,6 +90,7 @@ function ProfileSchema.default()
 		storedTeamTokens = 0,
 		stats = { casesPlayed = 0, casesCompleted = 0, eliminations = 0, editsMade = 0 },
 		archiveChallengeBest = {},
+		tutorialSeen = false,
 	}
 end
 

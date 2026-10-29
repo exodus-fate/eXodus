@@ -70,6 +70,9 @@ local function setEnabled(entry, on)
 	if entry.enabled ~= on then
 		entry.enabled = on
 		entry.gui.Enabled = on
+		if on then
+			entry.view:powerOn()
+		end
 	end
 end
 

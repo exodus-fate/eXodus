@@ -72,12 +72,12 @@ function KeypadController.init(playerGui)
 	local panel = UI.panel(gui, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(320, 470) })
 	UI.modalUnlock(panel)
 	UI.padding(panel, 14)
-	UI.text(panel, "PARTS CAGE · KEYPAD", { Font = Theme.FontBold, TextColor3 = Theme.Accent, Size = UDim2.new(1, 0, 0, 24) })
+	UI.text(panel, "PARTS CAGE · KEYPAD", { FontFace = Theme.FontBold, TextColor3 = Theme.Accent, Size = UDim2.new(1, 0, 0, 24) })
 	display = UI.text(panel, "", {
 		Position = UDim2.new(0, 0, 0, 30),
 		Size = UDim2.new(1, 0, 0, 48),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Font = Theme.FontBold,
+		FontFace = Theme.FontBold,
 		TextSize = 34,
 		TextColor3 = Theme.Accent,
 		BackgroundTransparency = 0,

@@ -25,7 +25,7 @@ local EffectsController = {}
 
 local rng = Random.new()
 local gui, staticFrame, staticDots, staticText
-local grade, blur
+local grade
 local staticUntil, staticStrength = 0, 0
 local ghostFolder
 local loopLastCycle = nil
@@ -188,22 +188,18 @@ end
 ---------------------------------------------------------------------------
 
 local function stepGrade(dt)
+	-- Driven by the camera's tension value so every effect agrees on it.
+	local danger = State.tension or 0
 	local model = presenter()
-	local root = myRoot()
-	local danger = 0
-	if model and root then
-		local d = (model.PrimaryPart.Position - root.Position).Magnitude
-		danger = math.clamp(1 - d / 50, 0, 1)
-		if model:GetAttribute("State") == "Hunting" then
-			danger = math.max(danger, 0.5)
-		end
+	if model and model:GetAttribute("State") == "Hunting" and State.inMission() then
+		danger = math.max(danger, 0.5)
 	end
 	local scale = State.intensity("distortion")
 	local targetSat = -danger * 0.45 * scale
-	local targetBlur = danger > 0.6 and (danger - 0.6) * 6 * scale or 0
 	grade.Saturation += (targetSat - grade.Saturation) * math.min(1, dt * 3)
 	grade.Contrast = danger * 0.15 * scale
-	blur.Size += (targetBlur - blur.Size) * math.min(1, dt * 3)
+	-- A cold shift as dread builds.
+	grade.TintColor = Color3.new(1, 1, 1):Lerp(Color3.fromRGB(214, 226, 236), danger * 0.6 * scale)
 end
 
 ---------------------------------------------------------------------------
@@ -418,7 +414,7 @@ function EffectsController.init(playerGui)
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.new(1, 0, 0, 60),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Font = Theme.FontTitle,
+		FontFace = Theme.FontTitle,
 		TextSize = 40,
 		TextColor3 = Theme.Cream,
 		TextStrokeTransparency = 0.4,
@@ -428,10 +424,6 @@ function EffectsController.init(playerGui)
 	grade = Instance.new("ColorCorrectionEffect")
 	grade.Name = "DeadAirHuntGrade"
 	grade.Parent = Lighting
-	blur = Instance.new("BlurEffect")
-	blur.Name = "DeadAirHuntBlur"
-	blur.Size = 0
-	blur.Parent = Lighting
 
 	State.cue:Connect(onCue)
 	State.ghosts:Connect(playGhosts)

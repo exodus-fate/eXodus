@@ -132,11 +132,11 @@ function ToolController.init(playerGui, deckController)
 	viewfinder = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, Parent = gui })
 	local inner = UI.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.86, 0.8), Parent = viewfinder })
 	vfFrame = UI.stroke(inner, Theme.Cream, 2, 0.2)
-	vfLabel = UI.text(inner, "", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -24, 0, 22), TextColor3 = Theme.Text, TextStrokeTransparency = 0.4, Font = Theme.FontBold })
+	vfLabel = UI.text(inner, "", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -24, 0, 22), TextColor3 = Theme.Text, TextStrokeTransparency = 0.4, FontFace = Theme.FontBold })
 
 	analyser = UI.panel(gui, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -20, 0.55, 0), Size = UDim2.fromOffset(220, 160), Visible = false })
 	UI.padding(analyser, 10)
-	analyserText = UI.text(analyser, "", { Size = UDim2.new(1, 0, 0, 50), Font = Theme.FontBold, TextColor3 = Theme.Accent })
+	analyserText = UI.text(analyser, "", { Size = UDim2.new(1, 0, 0, 50), FontFace = Theme.FontBold, TextColor3 = Theme.Accent })
 	analyserArrow = UI.new("Frame", { BackgroundColor3 = Theme.Amber, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.fromOffset(6, 60), Parent = analyser })
 
 	recorder = UI.panel(gui, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -20, 0.55, 0), Size = UDim2.fromOffset(420, 300), Visible = false })

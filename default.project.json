@@ -46,15 +46,15 @@
 
     "Lighting": {
       "$properties": {
-        "Technology": "ShadowMap",
+        "Technology": "Future",
         "ClockTime": 1,
         "Brightness": 1.2,
         "ExposureCompensation": -0.3,
         "Ambient": [0.13, 0.15, 0.14],
         "OutdoorAmbient": [0.17, 0.19, 0.18],
         "GlobalShadows": true,
-        "EnvironmentDiffuseScale": 0.15,
-        "EnvironmentSpecularScale": 0.2
+        "EnvironmentDiffuseScale": 0.25,
+        "EnvironmentSpecularScale": 0.55
       },
       "StationAtmosphere": {
         "$className": "Atmosphere",
@@ -83,6 +83,12 @@
           "Size": 16,
           "Threshold": 1.7
         }
+      }
+    },
+
+    "MaterialService": {
+      "$properties": {
+        "Use2022Materials": true
       }
     },
 

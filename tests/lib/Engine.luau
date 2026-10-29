@@ -26,7 +26,8 @@ local EVENTS = {
 	Died = true, OnServerEvent = true, OnClientEvent = true, ChildAdded = true, ChildRemoved = true,
 	DescendantAdded = true, AncestryChanged = true, Ended = true, Completed = true, Changed = true,
 	PromptGamePassPurchaseFinished = true, PromptProductPurchaseFinished = true, PromptButtonHoldBegan = true,
-	PromptButtonHoldEnded = true, MoveToFinished = true, FocusLost = true,
+	PromptButtonHoldEnded = true, MoveToFinished = true, FocusLost = true, PromptShown = true, PromptHidden = true,
+	CharacterRemoving = true,
 }
 
 local CALLBACKS = { OnServerInvoke = true, OnClientInvoke = true, ProcessReceipt = true }
@@ -89,6 +90,8 @@ function Engine.new()
 	self.callbacks = {}
 	self.stored = {}
 	self.moves = {}
+	self.velocities = {}
+	self.renderBindings = {}
 	self.sideOf = setmetatable({}, { __mode = "k" })
 	self.realOf = setmetatable({}, {
 		__index = function(_, proxy)
@@ -703,6 +706,24 @@ methods.BindActionAtPriority = function(engine)
 	end)
 end
 
+-- RenderStep bindings run every simulated frame, like RenderStepped.
+methods.BindToRenderStep = function(engine, _, real)
+	return bound(function(_, name, _, fn)
+		local conn = engine:signalFor(real, "RenderStepped"):Connect(fn)
+		engine.renderBindings[name] = conn
+	end)
+end
+
+methods.UnbindFromRenderStep = function(engine)
+	return bound(function(_, name)
+		local conn = engine.renderBindings[name]
+		if conn then
+			conn.Disconnect()
+			engine.renderBindings[name] = nil
+		end
+	end)
+end
+
 methods.GetConnectedGamepads = function()
 	return bound(function()
 		return {}
@@ -775,17 +796,29 @@ methods.CameraOffset = function(_, _, real)
 	end
 	return true, roblox.Vector3.new(0, 0, 0)
 end
-methods.MoveDirection = function(_, _, real)
+methods.MoveDirection = function(engine, _, real)
 	if real.ClassName ~= "Humanoid" then
 		return false
 	end
+	-- Tests can set a root velocity to simulate walking.
+	local root = real.Parent and real.Parent:FindFirstChild("HumanoidRootPart")
+	local v = root and engine.velocities[root]
+	if v and v.Magnitude > 0 then
+		return true, roblox.Vector3.new(v.X, 0, v.Z).Unit
+	end
 	return true, roblox.Vector3.new(0, 0, 0)
 end
-methods.AssemblyLinearVelocity = function(_, _, real)
+methods.AssemblyLinearVelocity = function(engine, _, real)
 	if not isA(real, "BasePart") then
 		return false
 	end
-	return true, roblox.Vector3.new(0, 0, 0)
+	return true, engine.velocities[real] or roblox.Vector3.new(0, 0, 0)
+end
+methods.FloorMaterial = function(_, _, real)
+	if real.ClassName ~= "Humanoid" then
+		return false
+	end
+	return true, roblox.Enum.Material.Concrete
 end
 for name, value in { TouchEnabled = false, KeyboardEnabled = true, MouseEnabled = true, GamepadEnabled = false } do
 	methods[name] = function(_, _, real)

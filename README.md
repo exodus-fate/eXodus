@@ -47,7 +47,12 @@ suite that runs the real code headlessly.
 | UI | Main menu (camera pan, Case Select, Evidence Archive, Equipment, Settings, Credits, Store), HUD laid out as the brief specifies, case report, spectator screen, keypad, pause menu. PC, mobile (touch buttons, tap prompts) and gamepad (prompts, bindings, selectable buttons). |
 | Progression | DataStore saves with session locking. Credits, research, clearance, evidence archive, case-tape replay with hidden frames, seven master-recording slots, challenges, cosmetics, loadout presets, desk decorations, Restricted mode and a weekly Archive Challenge with a leaderboard. |
 | Monetisation | Five gamepasses and four developer products, all cosmetic or convenience. Receipts are processed server-side exactly once. Re-entry is once per case, at a safe checkpoint, after a short delay. The game is completable for free. |
-| Accessibility | Subtitles for every important cue, a radio log, sliders for sensitivity, camera shake, distortion, flicker, text size and four audio groups, and a low-intensity mode that keeps all information. |
+| Camera and feel | First-person head bob locked to your footsteps (stronger when sprinting), a slight vignette, and a *tension* value that builds while the Presenter is near, hunting or in view, in dark rooms, during the Loop and as the clock runs down. Tension narrows the view, darkens and pulses the vignette, softens the far distance, adds breathing sway and a faint tremor, and turns fast camera turns into motion blur. It rises fast and drains slowly. |
+| CCTV look | Every camera feed (tape deck, station monitors, handheld, van) looks like a 1960s black-and-white tube set: greyscale picture, cool phosphor tint, interlace lines, grain and dust, a rolling hum bar, brightness flicker, vertical-hold slips, wobble, curved-glass falloff, rounded tube corners with a bezel, a glass reflection, a roll when you change channel and a warm-up line when it switches on. |
+| Surfaces | Every part is a named surface (`Config/Surfaces.luau`) mapped to Roblox's physically based materials: lino tiles, carpet, painted block, plaster with a two-tone wainscot and chair rail, suspended ceiling tiles on a T-bar grid, wood veneer, painted and bare steel, beige vinyl casings, rubber, leather, cardboard, glass. Props carry surface detail (drawer fronts, handles, vents, screws, seams, labels, cables, castors, gauges). Rooms get deterministic wear: damp stains, scuffs, worn walkways, stained ceiling tiles. Lighting uses the Future technology. Photographic textures can be added by pasting asset ids (see [Before you publish](#before-you-publish)). |
+| Lobby and in-game | The field office (lobby) is furnished as a working office: a window with blinds, a case wall with pinned evidence and red string, a coffee station, water cooler, filing cabinets, a floor plan, a clock and a coat rack. Investigators wear office clothes there (jacket, shirt and tie, lanyard with an ID badge) and change into field kit when they deploy (vest with reflective tape, chest radio, backpack, belt with pouches, headlamp). |
+| Onboarding and QoL | A skippable first-time tutorial (nine briefing cards with the right keys for your device), one-time tips during your first case, custom interaction prompts with hold progress, device-aware control hints, and one typeface (Roboto Mono) for every piece of text. |
+| Accessibility | Subtitles for every important cue, a radio log, sliders for sensitivity, field of view, head bob, motion blur, vignette, camera shake, distortion, flicker, text size and four audio groups, toggle sprint, crosshair and tips toggles, a key list for your device, reset to defaults, and a low-intensity mode that keeps all information. |
 
 **Not built yet:**
 
@@ -141,7 +146,7 @@ predictions interpreted before they happened, and smart use of charges, not spee
 | Interact | E | tap the prompt | X |
 | Equip tool | 1 | Tool button | D-pad up |
 | Open deck | R | Deck button | Y |
-| Sprint | Shift (hold) | Sprint button | L3 |
+| Sprint | Shift (hold, or toggle in Settings) | Sprint button | L3 |
 | Inspect | hold right mouse | hold Inspect | hold L2 |
 | Flashlight | F | Light button | D-pad down |
 | Menu / pause | Tab or P | Menu button | Select |
@@ -156,7 +161,8 @@ and pause, ←/→ to step a frame, and B or Backspace to close.
 ```
 src/
   shared/          ReplicatedStorage.Shared — used by server, client and tests
-    Config/        MapLayout, Case01, Evidence, Cosmetics, Monetisation, Audio, CaseRegistry
+    Config/        MapLayout, Case01, Evidence, Cosmetics, Monetisation, Audio, CaseRegistry,
+                   Surfaces (materials), Typeface (the one font)
     Core/          engine-independent game logic (unit tested)
       TimelineCore   events, edits, consequences, locking, case validation
       MissionCore    one case run: phases, objectives, items, anomalies, scoring, report
@@ -164,7 +170,7 @@ src/
       Footage        what a camera on a tape shows at time t
       SignalModel    deterministic signal quality
       Grading, Variants, ProfileSchema
-    World/         MapBuilder, Props, Figures (Presenter + silhouettes)
+    World/         MapBuilder, Props, Figures (Presenter + silhouettes), Outfits
     Util/, Net
   server/          ServerScriptService.Server
     Main.server.luau
@@ -172,9 +178,9 @@ src/
                    Data, Market, Lobby, World, Router
   client/          StarterPlayerScripts.Client
     Main.client.luau, State
-    Controllers/   HUD, Deck, Menu, Report, Spectate, Keypad, Input, Effects,
-                   Monitor, Audio, Tool
-    UI/            UI helpers, Theme, FootageView
+    Controllers/   HUD, Deck, Menu, Report, Spectate, Keypad, Input, Camera,
+                   Effects, Monitor, Audio, Tool, Prompt, Tutorial
+    UI/            UI helpers, Theme, Controls, FootageView
 tests/             Lune test runner, harness, mock engine and specs
 scripts/           build.sh, bake.luau
 ```
@@ -230,6 +236,13 @@ What the tests cover:
   cosmetics, settings and archive tape replay with hidden frames; and two players
   sharing a timeline and a team recovery vote. Any runtime error or warning
   fails the test.
+* **Presentation** — the first-run tutorial (shown, saved, replayable); every
+  label, button and sign in the one typeface; head bob rising and falling with
+  steps, stronger when sprinting, gone when stopped or switched off; tension
+  building near a hunting Presenter, lingering, then draining, with the
+  vignette closing in; the CCTV picture being truly greyscale, rolling on a
+  channel change; custom prompts; settings sanitising and toggle sprint; lobby
+  clothes swapping to field kit on deployment and back.
 
 The session tests already caught a bug that would have frozen the client in
 Studio. The control room's CCTV monitors cloned rooms that contained the other
@@ -244,11 +257,17 @@ monitors' cloned rooms, which grew to over a million instances when a case start
    their ids into `src/shared/Config/Monetisation.luau`. Prices there are the
    brief's starting hypotheses. Anything left at `0` stays hidden.
 3. **Audio**: add licensed or original sound ids in `src/shared/Config/Audio.luau`.
-4. **Play test**: a solo run, a 4-player run, and runs on mobile and with a
+4. **Photographic textures (optional)**: the built-in PBR materials are used by
+   default. For photo-real surfaces, upload texture sets (colour, normal,
+   roughness, metalness) and paste the ids into `Surfaces.Variants` in
+   `src/shared/Config/Surfaces.luau`. The server installs them into
+   MaterialService at start-up; every surface that names that variant switches
+   over, with no other changes.
+5. **Play test**: a solo run, a 4-player run, and runs on mobile and with a
    gamepad. Tune Presenter speeds and sight ranges in `Case01.modes` and
    `Case01.events`, lighting in `default.project.json` and `MapLayout`.
-5. Search Roblox and YouTube for close competitors before release, as the brief advises.
-6. Check the current Roblox policies on monetisation and age guidelines.
+6. Search Roblox and YouTube for close competitors before release, as the brief advises.
+7. Check the current Roblox policies on monetisation and age guidelines.
 
 ## Adding content
 

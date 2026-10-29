@@ -10,6 +10,10 @@ local UI = {}
 -- UI.new("Frame", { Size = ..., Parent = ... }, { children })
 function UI.new(className, props, children)
 	local inst = Instance.new(className)
+	-- Every text object starts in the game's one typeface.
+	if className == "TextLabel" or className == "TextButton" or className == "TextBox" then
+		inst.FontFace = Theme.Font
+	end
 	local parent = nil
 	for k, v in props or {} do
 		if k == "Parent" then
@@ -91,7 +95,7 @@ function UI.text(parent, text, props)
 	local label = UI.new("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = text or "",
-		Font = Theme.Font,
+		FontFace = Theme.Font,
 		TextSize = Theme.TextSize,
 		TextColor3 = Theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -115,7 +119,7 @@ function UI.button(parent, text, onClick, props)
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = text or "",
-		Font = Theme.FontBold,
+		FontFace = Theme.FontBold,
 		TextSize = Theme.TextSize,
 		TextColor3 = Theme.Text,
 		Size = UDim2.new(1, 0, 0, Theme.TouchTarget),

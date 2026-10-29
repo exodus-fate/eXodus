@@ -23,6 +23,7 @@ State.init(remotes)
 
 local AudioController = require(Controllers.AudioController)
 local HUDController = require(Controllers.HUDController)
+local CameraController = require(Controllers.CameraController)
 local InputController = require(Controllers.InputController)
 local DeckController = require(Controllers.DeckController)
 local MenuController = require(Controllers.MenuController)
@@ -32,6 +33,8 @@ local KeypadController = require(Controllers.KeypadController)
 local EffectsController = require(Controllers.EffectsController)
 local MonitorController = require(Controllers.MonitorController)
 local ToolController = require(Controllers.ToolController)
+local PromptController = require(Controllers.PromptController)
+local TutorialController = require(Controllers.TutorialController)
 
 local function safeInit(name, fn, ...)
 	local ok, err = pcall(fn, ...)
@@ -42,6 +45,7 @@ end
 
 safeInit("Audio", AudioController.init)
 safeInit("HUD", HUDController.init, playerGui)
+safeInit("Camera", CameraController.init, playerGui)
 safeInit("Input", InputController.init)
 safeInit("Deck", DeckController.init, playerGui)
 safeInit("Menu", MenuController.init, playerGui, DeckController)
@@ -51,6 +55,8 @@ safeInit("Keypad", KeypadController.init, playerGui)
 safeInit("Effects", EffectsController.init, playerGui)
 safeInit("Monitors", MonitorController.init)
 safeInit("Tools", ToolController.init, playerGui, DeckController)
+safeInit("Prompts", PromptController.init, playerGui)
+safeInit("Tutorial", TutorialController.init, playerGui)
 
 InputController.onTool = ToolController.toggle
 

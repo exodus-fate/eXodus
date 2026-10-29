@@ -21,6 +21,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
 local CaseRegistry = require(Shared.Config.CaseRegistry)
 local MapLayout = require(Shared.Config.MapLayout)
+local Surfaces = require(Shared.Config.Surfaces)
 local TimelineCore = require(Shared.Core.TimelineCore)
 local MapBuilder = require(Shared.World.MapBuilder)
 
@@ -47,6 +48,9 @@ for caseId, caseDef in CaseRegistry.Cases do
 		error(string.format("Case %s failed validation:\n%s", caseId, table.concat(errors, "\n")))
 	end
 end
+
+-- Optional photographic textures (see Shared.Config.Surfaces).
+Surfaces.install(game:GetService("MaterialService"))
 
 local remotes = Net.create(ReplicatedStorage)
 Router.init(remotes, Players)

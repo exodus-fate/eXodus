@@ -489,7 +489,9 @@ function MissionService.start(players, caseId, mode)
 		if player then
 			player:SetAttribute("InMission", true)
 			local cf = spawns[((i - 1) % math.max(1, #spawns)) + 1] or CFrame.new(0, 0, 58)
-			if not moveCharacter(player, cf) then
+			if moveCharacter(player, cf) then
+				deps.LobbyService.outfit(player)
+			else
 				spawnAt(player, cf)
 			end
 		end
@@ -541,7 +543,9 @@ function MissionService.join(player)
 	player:SetAttribute("InMission", true)
 	local spawns = deps.WorldService.spawnPoints()
 	local cf = spawns[1] or CFrame.new(0, 0, 58)
-	if not moveCharacter(player, cf) then
+	if moveCharacter(player, cf) then
+		deps.LobbyService.outfit(player)
+	else
 		spawnAt(player, cf)
 	end
 	dirty = true

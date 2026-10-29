@@ -23,6 +23,7 @@ local Format = require(Shared.Util.Format)
 local State = require(script.Parent.Parent.State)
 local UI = require(script.Parent.Parent.UI.UI)
 local Theme = require(script.Parent.Parent.UI.Theme)
+local Controls = require(script.Parent.Parent.UI.Controls)
 
 local MenuController = {}
 
@@ -37,7 +38,7 @@ end
 
 local function heading(parent, text, order)
 	return UI.text(parent, text, {
-		Font = Theme.FontBold,
+		FontFace = Theme.FontBold,
 		TextSize = Theme.LargeText,
 		TextColor3 = Theme.Accent,
 		Size = UDim2.new(1, 0, 0, 30),
@@ -87,7 +88,7 @@ local function stopPan()
 	end
 	local camera = Workspace.CurrentCamera
 	camera.CameraType = Enum.CameraType.Custom
-	camera.FieldOfView = 70
+	camera.FieldOfView = State.settings.fieldOfView or 70
 	local character = State.player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
@@ -451,9 +452,15 @@ function Pages.Settings(c)
 			State.saveSettingsSoon()
 		end
 	end
-	local holder = UI.new("Frame", { BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y, Size = UDim2.new(1, 0, 0, 0), LayoutOrder = 2, Parent = c })
-	UI.list(holder, 4)
-	UI.slider(holder, "MOUSE / LOOK SENSITIVITY", s.sensitivity, changed("sensitivity"), {
+	local function section(title, order)
+		local holder = UI.new("Frame", { BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y, Size = UDim2.new(1, 0, 0, 0), LayoutOrder = order, Parent = c })
+		UI.list(holder, 4)
+		UI.text(holder, title, { FontFace = Theme.FontBold, TextSize = Theme.SmallText, TextColor3 = Theme.Amber, LayoutOrder = -1 })
+		return holder
+	end
+
+	local controls = section("CONTROLS", 2)
+	UI.slider(controls, "MOUSE / LOOK SENSITIVITY", s.sensitivity, changed("sensitivity"), {
 		min = 0.2,
 		max = 3,
 		step = 0.1,
@@ -461,14 +468,35 @@ function Pages.Settings(c)
 			return string.format("%.1fx", v)
 		end,
 	})
-	UI.slider(holder, "MASTER VOLUME", s.master, changed("master"))
-	UI.slider(holder, "MUSIC", s.music, changed("music"))
-	UI.slider(holder, "AMBIENCE", s.ambience, changed("ambience"))
-	UI.slider(holder, "EFFECTS", s.effects, changed("effects"))
-	UI.slider(holder, "CAMERA SHAKE", s.cameraShake, changed("cameraShake"))
-	UI.slider(holder, "DISTORTION", s.distortion, changed("distortion"))
-	UI.slider(holder, "FLICKER", s.flicker, changed("flicker"))
-	UI.slider(holder, "TEXT SIZE", s.textScale, changed("textScale"), {
+	UI.toggle(controls, "TOGGLE SPRINT (press once instead of holding)", s.toggleSprint, changed("toggleSprint"))
+
+	local camera = section("CAMERA AND COMFORT", 3)
+	UI.slider(camera, "FIELD OF VIEW", s.fieldOfView, changed("fieldOfView"), {
+		min = 60,
+		max = 90,
+		step = 1,
+		format = function(v)
+			return string.format("%d°", v)
+		end,
+	})
+	UI.slider(camera, "HEAD BOB", s.headBob, changed("headBob"))
+	UI.slider(camera, "MOTION BLUR", s.motionBlur, changed("motionBlur"))
+	UI.slider(camera, "VIGNETTE", s.vignette, changed("vignette"))
+	UI.slider(camera, "CAMERA SHAKE", s.cameraShake, changed("cameraShake"))
+	UI.slider(camera, "DISTORTION", s.distortion, changed("distortion"))
+	UI.slider(camera, "FLICKER", s.flicker, changed("flicker"))
+	UI.toggle(camera, "CROSSHAIR", s.crosshair, changed("crosshair"))
+	UI.toggle(camera, "LOW INTENSITY MODE (keeps all information)", s.lowIntensity, changed("lowIntensity"))
+	para(camera, "Low intensity mode cuts flicker, distortion, shake, blur, bob and static to a minimum without hiding anything you need.", 99, Theme.TextDim)
+
+	local audio = section("AUDIO", 4)
+	UI.slider(audio, "MASTER VOLUME", s.master, changed("master"))
+	UI.slider(audio, "MUSIC", s.music, changed("music"))
+	UI.slider(audio, "AMBIENCE", s.ambience, changed("ambience"))
+	UI.slider(audio, "EFFECTS", s.effects, changed("effects"))
+
+	local display = section("TEXT AND HELP", 5)
+	UI.slider(display, "TEXT SIZE", s.textScale, changed("textScale"), {
 		min = 0.8,
 		max = 1.4,
 		step = 0.05,
@@ -476,10 +504,25 @@ function Pages.Settings(c)
 			return string.format("%d%%", math.floor(v * 100 + 0.5))
 		end,
 	})
-	UI.toggle(holder, "SUBTITLES", s.subtitles, changed("subtitles"))
-	UI.toggle(holder, "RADIO LOG ON HUD", s.radioLog, changed("radioLog"))
-	UI.toggle(holder, "LOW INTENSITY MODE (keeps all information)", s.lowIntensity, changed("lowIntensity"))
-	para(c, "Low intensity mode cuts flicker, distortion, shake and static to a minimum without hiding anything you need.", 3, Theme.TextDim)
+	UI.toggle(display, "SUBTITLES", s.subtitles, changed("subtitles"))
+	UI.toggle(display, "RADIO LOG ON HUD", s.radioLog, changed("radioLog"))
+	UI.toggle(display, "TIPS AND CONTROL HINTS", s.tips, changed("tips"))
+	UI.button(display, "REPLAY TUTORIAL", function()
+		MenuController.close()
+		State.cue:Fire({ cue = "OpenTutorial" })
+	end, { LayoutOrder = 98 })
+
+	local keysSection = section("KEY BINDINGS (" .. string.upper(Controls.device()) .. ")", 6)
+	for i, action in Controls.Order do
+		para(keysSection, string.format("%-16s %s", Controls.key(action), Controls.Labels[action]), i, Theme.Text)
+	end
+	para(keysSection, "Esc stays the Roblox menu.", 50, Theme.TextDim)
+
+	UI.button(c, "RESET ALL SETTINGS TO DEFAULTS", function()
+		State.applySettings(table.clone(ProfileSchema.DefaultSettings))
+		State.saveSettingsSoon()
+		MenuController.show("Settings")
+	end, { LayoutOrder = 20, TextColor3 = Theme.TextDim })
 end
 
 function Pages.Store(c)
@@ -609,7 +652,7 @@ local function build(playerGui)
 	local left = UI.new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 40, 0, 40), Size = UDim2.new(0.3, 0, 1, -80), Parent = root })
 	UI.list(left, 8)
 	UI.text(left, "NATIONAL BROADCAST RECOVERY DIVISION", { TextColor3 = Theme.TextDim, TextSize = Theme.SmallText, LayoutOrder = 1 })
-	title = UI.text(left, "DEAD AIR", { Font = Theme.FontTitle, TextSize = 64, TextColor3 = Theme.Cream, Size = UDim2.new(1, 0, 0, 70), LayoutOrder = 2 })
+	title = UI.text(left, "DEAD AIR", { FontFace = Theme.FontTitle, TextSize = 64, TextColor3 = Theme.Cream, Size = UDim2.new(1, 0, 0, 70), LayoutOrder = 2 })
 	UI.text(left, "CHANNEL ZERO // SIGNAL DETECTED", { TextColor3 = Theme.Accent, LayoutOrder = 3 })
 	statusLine = UI.text(left, "SIGNAL RECEIVED: 00:00:00", { TextColor3 = Theme.Amber, TextSize = Theme.SmallText, LayoutOrder = 4 })
 	UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16), LayoutOrder = 5, Parent = left })

@@ -10,6 +10,7 @@
 ]]
 
 local Props = require(script.Parent.Props)
+local Outfits = require(script.Parent.Outfits)
 
 local Figures = {}
 
@@ -140,17 +141,23 @@ function Figures.presenter(parent, opts)
 end
 
 -- A blocky investigator silhouette for footage (the team as the tape sees it).
+-- A person in field kit, for CCTV footage and rewind ghosts.
 function Figures.investigator(parent, colour)
 	local model = Instance.new("Model")
 	model.Name = "InvestigatorGhost"
 	local col = colour or Color3.fromRGB(40, 46, 42)
-	local function add(name, size, cf)
-		return Props.part(model, name, size, cf, col, { collide = false, shadow = false })
+	local function add(name, size, cf, c, material)
+		return Props.part(model, name, size, cf, c or col, { collide = false, shadow = false, material = material or Enum.Material.Fabric })
 	end
-	local root = add("Root", Vector3.new(2, 2, 1), CFrame.new(0, 3, 0))
-	add("Legs", Vector3.new(1.8, 2, 0.9), CFrame.new(0, 1, 0))
-	add("Arms", Vector3.new(3.4, 1.9, 0.9), CFrame.new(0, 3, 0))
-	add("Head", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 4.6, 0))
+	local root = add("Torso", Vector3.new(2, 2, 1), CFrame.new(0, 3, 0))
+	for _, side in { -1, 1 } do
+		add(side < 0 and "LeftLeg" or "RightLeg", Vector3.new(0.92, 2, 0.95), CFrame.new(side * 0.5, 1, 0), col:Lerp(Color3.new(0, 0, 0), 0.35))
+		add(side < 0 and "LeftArm" or "RightArm", Vector3.new(0.8, 1.9, 0.85), CFrame.new(side * 1.42, 3.02, 0) * CFrame.Angles(0, 0, math.rad(side * 4)))
+		add("Boot", Vector3.new(0.95, 0.35, 1.15), CFrame.new(side * 0.5, 0.18, -0.08), Color3.fromRGB(30, 26, 22), Enum.Material.Leather)
+	end
+	add("Head", Vector3.new(1.15, 1.2, 1.15), CFrame.new(0, 4.62, 0), colour or Color3.fromRGB(150, 128, 110), Enum.Material.Plastic)
+	add("Neck", Vector3.new(0.6, 0.3, 0.6), CFrame.new(0, 4.05, 0), colour or Color3.fromRGB(150, 128, 110), Enum.Material.Plastic)
+	Outfits.apply(model, "Field", colour or Color3.fromRGB(92, 108, 122))
 	model.PrimaryPart = root
 	model:SetAttribute("RootHeight", 3)
 	model.Parent = parent

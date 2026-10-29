@@ -27,6 +27,7 @@ local Format = require(Shared.Util.Format)
 local State = require(script.Parent.Parent.State)
 local UI = require(script.Parent.Parent.UI.UI)
 local Theme = require(script.Parent.Parent.UI.Theme)
+local Controls = require(script.Parent.Parent.UI.Controls)
 
 local HUDController = {}
 
@@ -75,13 +76,13 @@ local function build(playerGui)
 	local tl = corner(safe, Vector2.new(0, 0), UDim2.new(0, 0, 0, 30), UDim2.new(0.45, 0, 0, 160))
 	UI.list(tl, 2)
 	w.caseName = shadowText(tl, "", { TextColor3 = Theme.TextDim, TextSize = Theme.SmallText, LayoutOrder = 1 })
-	w.objective = shadowText(tl, "", { TextColor3 = Theme.Text, TextSize = 18, Font = Theme.FontBold, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2 })
+	w.objective = shadowText(tl, "", { TextColor3 = Theme.Text, TextSize = 18, FontFace = Theme.FontBold, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2 })
 	w.clue = shadowText(tl, "", { TextColor3 = Theme.AccentDim, TextSize = Theme.SmallText, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3 })
 	w.optional = shadowText(tl, "", { TextColor3 = Theme.TextDim, TextSize = Theme.SmallText, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 4 })
 
 	-- Top right: signal
 	local tr = corner(safe, Vector2.new(1, 0), UDim2.new(1, 0, 0, 30), UDim2.fromOffset(220, 60))
-	w.signal = shadowText(tr, "SIGNAL 100%", { TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.FontBold, TextSize = 20, Size = UDim2.new(1, 0, 0, 24) })
+	w.signal = shadowText(tr, "SIGNAL 100%", { TextXAlignment = Enum.TextXAlignment.Right, FontFace = Theme.FontBold, TextSize = 20, Size = UDim2.new(1, 0, 0, 24) })
 	local bar = UI.new("Frame", { BackgroundColor3 = Theme.PanelLight, BorderSizePixel = 0, Position = UDim2.new(0, 0, 0, 28), Size = UDim2.new(1, 0, 0, 6), Parent = tr })
 	w.signalFill = UI.new("Frame", { BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = bar })
 	w.signalBand = shadowText(tr, "", { TextXAlignment = Enum.TextXAlignment.Right, TextSize = Theme.SmallText, TextColor3 = Theme.TextDim, Position = UDim2.new(0, 0, 0, 36), Size = UDim2.new(1, 0, 0, 18) })
@@ -112,7 +113,7 @@ local function build(playerGui)
 	local bc = corner(safe, Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, 0), UDim2.new(0.5, 0, 0, 220))
 	w.subtitles = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 140), Parent = bc })
 	UI.list(w.subtitles, 4, Enum.FillDirection.Vertical, Enum.HorizontalAlignment.Center).VerticalAlignment = Enum.VerticalAlignment.Bottom
-	w.tool = shadowText(bc, "", { TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.FontBold, Position = UDim2.new(0, 0, 1, -50), Size = UDim2.new(1, 0, 0, 20) })
+	w.tool = shadowText(bc, "", { TextXAlignment = Enum.TextXAlignment.Center, FontFace = Theme.FontBold, Position = UDim2.new(0, 0, 1, -50), Size = UDim2.new(1, 0, 0, 20) })
 	w.hint = shadowText(bc, "", { TextXAlignment = Enum.TextXAlignment.Center, TextSize = Theme.SmallText, TextColor3 = Theme.TextDim, Position = UDim2.new(0, 0, 1, -28), Size = UDim2.new(1, 0, 0, 18) })
 	local stamina = UI.new("Frame", { BackgroundColor3 = Theme.PanelLight, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, -6), Size = UDim2.fromOffset(160, 3), Parent = bc })
 	w.staminaFill = UI.new("Frame", { BackgroundColor3 = Theme.Cream, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = stamina })
@@ -122,7 +123,7 @@ local function build(playerGui)
 	local br = corner(safe, Vector2.new(1, 1), UDim2.new(1, 0, 1, 0), UDim2.fromOffset(260, 56))
 	w.recDot = UI.new("Frame", { BackgroundColor3 = Theme.Danger, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -150, 0, 6), Size = UDim2.fromOffset(12, 12), Parent = br })
 	UI.corner(w.recDot, 6)
-	w.rec = shadowText(br, "REC", { TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.FontBold, TextSize = 20, Size = UDim2.new(1, 0, 0, 24) })
+	w.rec = shadowText(br, "REC", { TextXAlignment = Enum.TextXAlignment.Right, FontFace = Theme.FontBold, TextSize = 20, Size = UDim2.new(1, 0, 0, 24) })
 	w.recState = shadowText(br, "", { TextXAlignment = Enum.TextXAlignment.Right, TextSize = Theme.SmallText, TextColor3 = Theme.TextDim, Position = UDim2.new(0, 0, 0, 28), Size = UDim2.new(1, 0, 0, 18) })
 
 	-- Toasts (top centre)
@@ -135,7 +136,7 @@ local function build(playerGui)
 		Position = UDim2.fromScale(0.5, 0.32),
 		Size = UDim2.new(0.8, 0, 0, 40),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Font = Theme.FontTitle,
+		FontFace = Theme.FontTitle,
 		TextSize = 30,
 		TextColor3 = Theme.Cream,
 		TextTransparency = 1,
@@ -266,12 +267,18 @@ end
 ---------------------------------------------------------------------------
 
 local function controlHint()
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return "Tap prompts to interact · buttons on the right for tools"
-	elseif #UserInputService:GetConnectedGamepads() > 0 and UserInputService.GamepadEnabled and not UserInputService.MouseEnabled then
-		return "[X] Interact · [Y] Deck · [D-Up] Tool · [D-Down] Light · [L3] Sprint · [Select] Menu"
+	if not State.settings.tips then
+		return ""
 	end
-	return "[E] Interact · [R] Deck · [1] Tool · [F] Flashlight · [Shift] Sprint · [RMB] Inspect · [Tab] Menu"
+	local device = Controls.device()
+	if device == "touch" then
+		return "Tap prompts to interact · buttons on the right for tools"
+	end
+	local parts = {}
+	for _, action in { "Interact", "Deck", "Tool", "Flashlight", "Sprint", "Inspect", "Menu" } do
+		table.insert(parts, Controls.tag(action, device) .. " " .. action)
+	end
+	return table.concat(parts, " · ")
 end
 
 local function setCharges(m)
@@ -340,7 +347,7 @@ local function update()
 	local m = State.mission
 	local inCase = m ~= nil and State.inMission()
 	gui.Enabled = not State.ui.menu and not State.ui.deck and not State.ui.report
-	w.crosshair.Visible = inCase and State.isAlive()
+	w.crosshair.Visible = inCase and State.isAlive() and State.settings.crosshair ~= false
 	w.staminaBar.Visible = HUDController.stamina < 0.99
 	w.staminaFill.Size = UDim2.fromScale(HUDController.stamina, 1)
 

@@ -30,7 +30,8 @@ local function makePrompt(parent, action, object, hold)
 	prompt.RequiresLineOfSight = false
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
-	prompt.Style = Enum.ProximityPromptStyle.Default
+	-- Drawn by the client's PromptController in the game's own typeface.
+	prompt.Style = Enum.ProximityPromptStyle.Custom
 	prompt.ClickablePrompt = true
 	prompt.Parent = parent
 	return prompt

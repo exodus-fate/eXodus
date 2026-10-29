@@ -27,7 +27,8 @@ end
 local function solidParts(root, filter)
 	local list = {}
 	for _, d in root:GetDescendants() do
-		if d:IsA("BasePart") and d.CanCollide and d.Transparency < 1 and (not filter or filter(d)) then
+		-- Invisible collision boxes (bench frames, tripods) still block.
+		if d:IsA("BasePart") and d.CanCollide and (not filter or filter(d)) then
 			table.insert(list, d)
 		end
 	end
@@ -243,4 +244,84 @@ test("the Presenter rig and footage figures build", function()
 	expect(Figures.rootHeight(ghost)).toBeNear(Figures.LEG_LENGTH + 1, 1e-4)
 	local person = Figures.investigator(workspace)
 	expect(Figures.rootHeight(person)).toBe(3)
+end)
+
+test("every surface is a real Roblox material and photo textures plug in", function()
+	local Surfaces = req(Shared.Config.Surfaces)
+	for name, def in Surfaces.List do
+		local ok = pcall(function()
+			return roblox.Enum.Material[def.material]
+		end)
+		if not ok then
+			error(name .. " uses unknown material " .. def.material)
+		end
+		if def.variant and not Surfaces.Variants[def.variant] then
+			error(name .. " names missing variant " .. def.variant)
+		end
+	end
+	-- Nothing configured: no variants, built-in materials only.
+	local ms = roblox.Instance.new("MaterialService")
+	expect(Surfaces.install(ms)).toBe(0)
+	expect(Surfaces.variantFor("lino") == nil).toBeTruthy()
+	-- Paste an id and the variant is installed and used.
+	Surfaces.Variants.DeadAir_Linoleum.colorMap = "rbxassetid://1"
+	expect(Surfaces.install(ms)).toBe(1)
+	expect(ms.DeadAir_Linoleum.BaseMaterial).toBe(roblox.Enum.Material.CeramicTiles)
+	expect(Surfaces.variantFor("lino")).toBe("DeadAir_Linoleum")
+	local Props = req(Shared.World.Props)
+	local p = Props.part(workspace, "T", roblox.Vector3.new(1, 1, 1), roblox.CFrame.new(), "grey", { surface = "lino" })
+	expect(p.MaterialVariant).toBe("DeadAir_Linoleum")
+	Surfaces.Variants.DeadAir_Linoleum.colorMap = ""
+	p:Destroy()
+end)
+
+test("the station and field office are built from textured surfaces", function()
+	build()
+	local counts, smooth, total = {}, 0, 0
+	for _, root in { station, hq } do
+		for _, d in root:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 1 then
+				total += 1
+				counts[d.Material.Name] = (counts[d.Material.Name] or 0) + 1
+				if d.Material == roblox.Enum.Material.SmoothPlastic then
+					smooth += 1
+				end
+			end
+		end
+	end
+	-- Untextured smooth plastic is kept for signal lamps and a few painted signs.
+	expect(smooth / total < 0.06).toBeTruthy()
+	for _, m in { "CeramicTiles", "Carpet", "Plaster", "Brick", "Wood", "Metal", "Plastic", "Rubber", "Fabric", "Leather", "Cardboard", "Glass" } do
+		if not counts[m] then
+			error("no part uses " .. m)
+		end
+	end
+	-- The lobby is dressed as an office.
+	for _, name in { "CorkBoard", "WaterCooler", "WindowGlass", "CoatRack" } do
+		if not hq:FindFirstChild(name, true) then
+			error("field office missing " .. name)
+		end
+	end
+end)
+
+test("round parts are sized the way Roblox draws them", function()
+	-- A cylinder runs along X with diameter min(Y, Z); a ball uses the smallest
+	-- side. Unequal sides mean the part renders differently from its size.
+	build()
+	local problems = {}
+	for _, root in { station, hq } do
+		for _, d in root:GetDescendants() do
+			if d:IsA("Part") then
+				local s = d.Size
+				if d.Shape == roblox.Enum.PartType.Cylinder and math.abs(s.Y - s.Z) > 1e-3 then
+					table.insert(problems, d:GetFullName() .. " cylinder " .. tostring(s))
+				elseif d.Shape == roblox.Enum.PartType.Ball and (math.abs(s.X - s.Y) > 1e-3 or math.abs(s.Y - s.Z) > 1e-3) then
+					table.insert(problems, d:GetFullName() .. " ball " .. tostring(s))
+				end
+			end
+		end
+	end
+	if #problems > 0 then
+		error(table.concat(problems, "\n      "))
+	end
 end)

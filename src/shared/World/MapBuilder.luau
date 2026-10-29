@@ -18,6 +18,7 @@
 ]]
 
 local MapLayout = require(script.Parent.Parent.Config.MapLayout)
+local Rng = require(script.Parent.Parent.Util.Rng)
 local Props = require(script.Parent.Props)
 
 local MapBuilder = {}
@@ -89,7 +90,34 @@ local function edgeOpenings(roomId, room, edge)
 	return list
 end
 
-local function wallPiece(parent, room, edge, a, b, y0, y1, colour, material)
+-- Room style names (MapLayout) -> surfaces. Concrete walls are painted block.
+local WALL_SURFACE = { Plaster = "plaster", SmoothPlastic = "plaster", Concrete = "breezeBlock", Fabric = "acousticFoam", Wood = "panelling" }
+local FLOOR_SURFACE = { Slate = "lino", Carpet = "carpet", Concrete = "concrete", DiamondPlate = "checkerPlate" }
+
+local function wallSurface(room)
+	return WALL_SURFACE[room.wallMaterial or "Plaster"] or "plaster"
+end
+
+-- The plane of a wall's room-facing side, offset into the room by `inset`.
+local function interiorFace(room, edge, along, y, inset)
+	if edge == "N" then
+		return Vector3.new(along, y, room.z0 + T + inset)
+	elseif edge == "S" then
+		return Vector3.new(along, y, room.z1 - T - inset)
+	elseif edge == "W" then
+		return Vector3.new(room.x0 + T + inset, y, along)
+	end
+	return Vector3.new(room.x1 - T - inset, y, along)
+end
+
+local function faceSize(edge, len, height, thickness)
+	if edge == "N" or edge == "S" then
+		return Vector3.new(len, height, thickness)
+	end
+	return Vector3.new(thickness, height, len)
+end
+
+local function wallPiece(parent, room, edge, a, b, y0, y1, colour, surface)
 	if b - a < 0.01 or y1 - y0 < 0.01 then
 		return
 	end
@@ -105,12 +133,31 @@ local function wallPiece(parent, room, edge, a, b, y0, y1, colour, material)
 	else
 		size, pos = Vector3.new(T, height, len), Vector3.new(room.x1 - T / 2, y, mid)
 	end
-	part(parent, "Wall", size, CFrame.new(pos), colour, { material = material })
+	part(parent, "Wall", size, CFrame.new(pos), colour, { surface = surface })
+	-- Two-tone institutional paint: a darker lower band (with a timber chair
+	-- rail on plaster) along every piece that reaches the floor.
+	if room.outdoor or y0 > 0 or len < 0.5 or (surface ~= "plaster" and surface ~= "breezeBlock") then
+		return
+	end
+	local band = math.min(y1, surface == "plaster" and 3 or 4)
+	local inset = len - 0.02
+	part(parent, "Wainscot", faceSize(edge, inset, band, 0.04), CFrame.new(interiorFace(room, edge, mid, band / 2, 0.02)), Props.darker(colour, 0.22), {
+		surface = surface,
+		collide = false,
+		shadow = false,
+	})
+	if surface == "plaster" and y1 > band + 0.2 then
+		part(parent, "ChairRail", faceSize(edge, inset, 0.18, 0.12), CFrame.new(interiorFace(room, edge, mid, band, 0.06)), room.trim, {
+			surface = "veneer",
+			collide = false,
+			shadow = false,
+		})
+	end
 end
 
 local function buildWall(parent, roomId, room, edge, height)
 	local wallColour = room.wall
-	local material = Enum.Material[room.wallMaterial or "Plaster"]
+	local material = wallSurface(room)
 	local s0, s1
 	if edge == "N" or edge == "S" then
 		s0, s1 = room.x0, room.x1
@@ -134,11 +181,103 @@ local function buildWall(parent, roomId, room, edge, height)
 		local trimParent = parent
 		if edge == "N" or edge == "S" then
 			local z = edge == "N" and (room.z0 + T + 0.05) or (room.z1 - T - 0.05)
-			part(trimParent, "Skirting", Vector3.new(room.x1 - room.x0 - 2 * T, 0.6, 0.1), CFrame.new((room.x0 + room.x1) / 2, 0.3, z), room.trim, { collide = false, shadow = false })
+			part(trimParent, "Skirting", Vector3.new(room.x1 - room.x0 - 2 * T, 0.6, 0.1), CFrame.new((room.x0 + room.x1) / 2, 0.3, z), room.trim, { collide = false, shadow = false, surface = "veneer" })
 		else
 			local x = edge == "W" and (room.x0 + T + 0.05) or (room.x1 - T - 0.05)
-			part(trimParent, "Skirting", Vector3.new(0.1, 0.6, room.z1 - room.z0 - 2 * T), CFrame.new(x, 0.3, (room.z0 + room.z1) / 2), room.trim, { collide = false, shadow = false })
+			part(trimParent, "Skirting", Vector3.new(0.1, 0.6, room.z1 - room.z0 - 2 * T), CFrame.new(x, 0.3, (room.z0 + room.z1) / 2), room.trim, { collide = false, shadow = false, surface = "veneer" })
 		end
+	end
+end
+
+-- Office-like rooms get a suspended tile ceiling; plant rooms bare concrete.
+local function hasDropCeiling(room)
+	local surface = wallSurface(room)
+	return not room.outdoor and room.h <= 13 and (surface == "plaster" or surface == "panelling")
+end
+
+local function hashString(text)
+	local h = 2166136261
+	for i = 1, #text do
+		h = bit32.bxor(h, string.byte(text, i))
+		h = (h * 16777619) % 4294967296
+	end
+	return h
+end
+
+-- Wear and tear: water stains, scuffs, worn walkways, ceiling grid and vents.
+-- Deterministic per room so every server (and every footage clone) matches.
+local function dressRoom(shell, roomId, room)
+	local rng = Rng.new(hashString(roomId))
+	local w, d = room.x1 - room.x0, room.z1 - room.z0
+	local cx, cz = (room.x0 + room.x1) / 2, (room.z0 + room.z1) / 2
+	local detail = Props.detail
+
+	-- Suspended ceiling grid: T-bars every four studs.
+	if hasDropCeiling(room) then
+		local y = room.h - 0.03
+		local bar = Color3.fromRGB(196, 192, 180)
+		for x = room.x0 + 4, room.x1 - 1, 4 do
+			detail(shell, "TBar", Vector3.new(0.12, 0.06, d - 2 * T), CFrame.new(x, y, cz), bar, "paintedMetal")
+		end
+		for z = room.z0 + 4, room.z1 - 1, 4 do
+			detail(shell, "TBar", Vector3.new(w - 2 * T, 0.06, 0.12), CFrame.new(cx, y, z), bar, "paintedMetal")
+		end
+		-- A couple of stained tiles.
+		for _ = 1, math.clamp(math.floor(w * d / 600), 1, 4) do
+			local tx = room.x0 + 4 * rng:int(1, math.max(1, math.floor(w / 4) - 1)) - 2
+			local tz = room.z0 + 4 * rng:int(1, math.max(1, math.floor(d / 4) - 1)) - 2
+			detail(shell, "StainedTile", Vector3.new(3.6, 0.02, 3.6), CFrame.new(tx, room.h - 0.012, tz), Color3.fromRGB(150, 120, 74), "ceilingTile", { transparency = 0.45 + rng:float() * 0.3 })
+		end
+	end
+
+	if room.outdoor then
+		return
+	end
+
+	-- Air-handling grille in the ceiling.
+	local gx = room.x0 + w * (0.25 + rng:float() * 0.5)
+	local gz = room.z0 + d * (0.25 + rng:float() * 0.5)
+	detail(shell, "VentGrille", Vector3.new(2, 0.06, 2), CFrame.new(gx, room.h - 0.04, gz), Color3.fromRGB(150, 148, 140), "paintedMetal")
+	for i = 0, 5 do
+		detail(shell, "VentSlat", Vector3.new(1.8, 0.07, 0.1), CFrame.new(gx, room.h - 0.08, gz - 0.75 + i * 0.3), Color3.fromRGB(26, 26, 24), "blackPlastic")
+	end
+
+	-- Stains on the walls: damp creeping down from the ceiling, scuffs and dirt
+	-- along the bottom. The field office is kept tidier.
+	local count = room.hq and 1 or math.clamp(math.floor((w + d) / 12), 2, 9)
+	local edges = { "N", "S", "W", "E" }
+	for _ = 1, count do
+		local edge = rng:pick(edges)
+		local s0, s1
+		if edge == "N" or edge == "S" then
+			s0, s1 = room.x0 + T + 1, room.x1 - T - 1
+		else
+			s0, s1 = room.z0 + T + 1, room.z1 - T - 1
+		end
+		local along = s0 + (s1 - s0) * rng:float()
+		local clear = true
+		for _, o in edgeOpenings(roomId, room, edge) do
+			if along > o.a - 2 and along < o.b + 2 then
+				clear = false
+			end
+		end
+		if clear and s1 > s0 then
+			local top = rng:float() < 0.5
+			local width = top and (0.8 + rng:float() * 1.6) or (1.5 + rng:float() * 3)
+			local height = top and (1.2 + rng:float() * 2.4) or (0.5 + rng:float() * 0.9)
+			local y = top and (room.h - height / 2) or (0.6 + height / 2)
+			local colour = top and Color3.fromRGB(96, 78, 52) or Color3.fromRGB(34, 30, 26)
+			detail(shell, top and "DampStain" or "Scuff", faceSize(edge, width, height, 0.02), CFrame.new(interiorFace(room, edge, along, y, 0.05)), colour, "concrete", {
+				transparency = 0.72 + rng:float() * 0.16,
+			})
+		end
+	end
+
+	-- Worn walkway down the middle of corridors and halls.
+	if string.find(roomId, "Corridor") or string.find(roomId, "Hall") or string.find(roomId, "Passage") then
+		local along = w >= d
+		local size = along and Vector3.new(w - 2 * T, 0.02, math.min(d * 0.45, 3.5)) or Vector3.new(math.min(w * 0.45, 3.5), 0.02, d - 2 * T)
+		detail(shell, "WornPath", size, CFrame.new(cx, 0.011, cz), Props.darker(room.floor, 0.2), FLOOR_SURFACE[room.floorMaterial or "Concrete"] or "concrete", { transparency = 0.55 })
 	end
 end
 
@@ -147,22 +286,25 @@ local function buildShell(roomFolder, roomId, room)
 	local w, d = room.x1 - room.x0, room.z1 - room.z0
 	local cx, cz = (room.x0 + room.x1) / 2, (room.z0 + room.z1) / 2
 	local floor = part(shell, "Floor", Vector3.new(w, 1, d), CFrame.new(cx, -0.5, cz), room.floor, {
-		material = Enum.Material[room.floorMaterial or "Concrete"],
+		surface = FLOOR_SURFACE[room.floorMaterial or "Concrete"] or "concrete",
 	})
 	floor:SetAttribute("RoomId", roomId)
 	if room.outdoor then
 		for _, edge in { "N", "W", "E" } do
 			buildWall(shell, roomId, room, edge, 10)
 		end
+		dressRoom(shell, roomId, room)
 		return
 	end
-	part(shell, "Ceiling", Vector3.new(w, 1, d), CFrame.new(cx, room.h + 0.5, cz), room.hq and "creamDark" or "greyDark", {
-		material = Enum.Material.SmoothPlastic,
+	local drop = hasDropCeiling(room)
+	part(shell, "Ceiling", Vector3.new(w, 1, d), CFrame.new(cx, room.h + 0.5, cz), drop and Color3.fromRGB(178, 174, 160) or "greyDark", {
+		surface = drop and "ceilingTile" or "concrete",
 		shadow = true,
 	})
 	for _, edge in { "N", "S", "W", "E" } do
 		buildWall(shell, roomId, room, edge, room.h)
 	end
+	dressRoom(shell, roomId, room)
 end
 
 ---------------------------------------------------------------------------
@@ -181,12 +323,12 @@ local function fluorescent(parent, pos, along, roomId, range, shadows, ceiling)
 			part(parent, "Rod", Vector3.new(0.08, drop, 0.08), CFrame.new(pos + offset + Vector3.new(0, drop / 2, 0)), "greyDark", {
 				collide = false,
 				shadow = false,
-				material = Enum.Material.Metal,
+				surface = "paintedMetal",
 			})
 		end
 	end
 	local panel = part(parent, "Fluorescent", size, CFrame.new(pos), FLUORESCENT, {
-		material = Enum.Material.Neon,
+		surface = "glow",
 		collide = false,
 		shadow = false,
 	})
@@ -206,7 +348,7 @@ end
 
 local function emergencyLight(parent, pos, roomId, colour)
 	local box = part(parent, "Emergency", Vector3.new(0.9, 0.5, 0.5), CFrame.new(pos), colour or AMBER, {
-		material = Enum.Material.Neon,
+		surface = "glow",
 		collide = false,
 		shadow = false,
 	})
@@ -239,7 +381,18 @@ local function buildLights(roomFolder, roomId, room)
 				local x = room.x0 + w * (i - 0.5) / nx
 				local z = room.z0 + d * (j - 0.5) / nz
 				-- Only the first fixture casts shadows: atmosphere without the cost.
-				fluorescent(lights, Vector3.new(x, y, z), "x", roomId, range, i == 1 and j == 1 and not room.hq, ceiling)
+				local panel = fluorescent(lights, Vector3.new(x, y, z), "x", roomId, range, i == 1 and j == 1 and not room.hq, ceiling)
+				if room.hq then
+					-- The field office is meant to feel safe: a soft omni fill lights
+					-- the ceiling and walls (Roblox has no bounce light).
+					local fill = Instance.new("PointLight")
+					fill.Name = "Fill"
+					fill.Range = 24
+					fill.Brightness = 0.45
+					fill.Color = Color3.fromRGB(255, 236, 206)
+					fill.Shadows = false
+					fill.Parent = panel
+				end
 			end
 		end
 	elseif room.lights == "line" then
@@ -327,18 +480,18 @@ local function buildPanel(model, door, centre, width, colour, withWindow)
 	local thickness = 0.3
 	local base = doorFrame(door, centre, 0)
 	if not withWindow then
-		local panel = part(model, "Panel", Vector3.new(width, ph, thickness), base * CFrame.new(0, ph / 2, 0), colour, { material = Enum.Material.Wood })
+		local panel = part(model, "Panel", Vector3.new(width, ph, thickness), base * CFrame.new(0, ph / 2, 0), colour, { surface = "veneer" })
 		return panel
 	end
 	local winBottom, winTop, winWidth = 4.6, 7.2, math.min(1.6, width - 1)
-	local lower = part(model, "Panel", Vector3.new(width, winBottom, thickness), base * CFrame.new(0, winBottom / 2, 0), colour, { material = Enum.Material.Wood })
+	local lower = part(model, "Panel", Vector3.new(width, winBottom, thickness), base * CFrame.new(0, winBottom / 2, 0), colour, { surface = "veneer" })
 	local pieces = {
-		part(model, "PanelUpper", Vector3.new(width, ph - winTop, thickness), base * CFrame.new(0, (winTop + ph) / 2, 0), colour, { material = Enum.Material.Wood, anchored = false, massless = true }),
-		part(model, "PanelLeft", Vector3.new((width - winWidth) / 2, winTop - winBottom, thickness), base * CFrame.new(-(width + winWidth) / 4, (winBottom + winTop) / 2, 0), colour, { material = Enum.Material.Wood, anchored = false, massless = true }),
-		part(model, "PanelRight", Vector3.new((width - winWidth) / 2, winTop - winBottom, thickness), base * CFrame.new((width + winWidth) / 4, (winBottom + winTop) / 2, 0), colour, { material = Enum.Material.Wood, anchored = false, massless = true }),
+		part(model, "PanelUpper", Vector3.new(width, ph - winTop, thickness), base * CFrame.new(0, (winTop + ph) / 2, 0), colour, { surface = "veneer", anchored = false, massless = true }),
+		part(model, "PanelLeft", Vector3.new((width - winWidth) / 2, winTop - winBottom, thickness), base * CFrame.new(-(width + winWidth) / 4, (winBottom + winTop) / 2, 0), colour, { surface = "veneer", anchored = false, massless = true }),
+		part(model, "PanelRight", Vector3.new((width - winWidth) / 2, winTop - winBottom, thickness), base * CFrame.new((width + winWidth) / 4, (winBottom + winTop) / 2, 0), colour, { surface = "veneer", anchored = false, massless = true }),
 	}
 	local glass = part(model, "VisionGlass", Vector3.new(winWidth, winTop - winBottom, 0.12), base * CFrame.new(0, (winBottom + winTop) / 2, 0), Color3.fromRGB(150, 170, 160), {
-		material = Enum.Material.Glass,
+		surface = "glass",
 		transparency = 0.55,
 		anchored = false,
 		massless = true,
@@ -376,7 +529,7 @@ local function buildDoor(doorsFolder, door, trimColour)
 
 	local panelColour = door.window and "brown" or "brownDark"
 	if door.kind == "freight" then
-		local shutter = part(model, "Panel", Vector3.new(door.width, top, 0.5), doorFrame(door, door.center, top / 2), "greyDark", { material = Enum.Material.CorrodedMetal })
+		local shutter = part(model, "Panel", Vector3.new(door.width, top, 0.5), doorFrame(door, door.center, top / 2), "greyDark", { surface = "rust" })
 		for i = 1, 8 do
 			part(model, "Slat" .. i, Vector3.new(door.width, 0.1, 0.55), doorFrame(door, door.center, i * top / 9), "black", {
 				collide = false,
@@ -420,7 +573,7 @@ local function buildDoor(doorsFolder, door, trimColour)
 		shadow = false,
 		anchored = false,
 		massless = true,
-		material = Enum.Material.Metal,
+		surface = "paintedMetal",
 	})
 	Props.weld(panel, handle)
 	return model
@@ -436,7 +589,7 @@ local function buildWindows(windowsFolder)
 			cf = CFrame.new(win.at, (win.y0 + win.y1) / 2, win.center) * CFrame.Angles(0, math.rad(90), 0)
 		end
 		local glass = part(windowsFolder, "Glass", Vector3.new(win.width, win.y1 - win.y0, 0.2), cf, Color3.fromRGB(140, 160, 150), {
-			material = Enum.Material.Glass,
+			surface = "glass",
 			transparency = 0.6,
 			shadow = false,
 		})
@@ -515,13 +668,13 @@ function Furnish.Lobby(f)
 	Props.vcr(f, facing(Vector3.new(4.8, 3.4, 46.8), SOUTH))
 	monitor(f, facing(Vector3.new(4.8, 4, 46.8), SOUTH), 0.9, "CAM01", "LobbyVCR")
 	-- Briefing terminal.
-	part(f, "TerminalTable", Vector3.new(3, 3, 2.4), CFrame.new(-12, 1.5, 46.8), "brownDark", { material = Enum.Material.Wood })
+	part(f, "TerminalTable", Vector3.new(3, 3, 2.4), CFrame.new(-12, 1.5, 46.8), "brownDark", { surface = "veneer" })
 	Props.beigeComputer(f, facing(Vector3.new(-12, 3, 46.8), SOUTH))
 	for i = 0, 3 do
 		Props.chair(f, facing(Vector3.new(20.5, 0, 52 + i * 4), WEST), "blueDark")
 	end
 	Props.bench(f, facing(Vector3.new(-21.5, 0, 58), EAST), 7)
-	part(f, "SideTable", Vector3.new(2, 2.6, 2), CFrame.new(-20.2, 1.3, 66.6), "brownDark", { material = Enum.Material.Wood })
+	part(f, "SideTable", Vector3.new(2, 2.6, 2), CFrame.new(-20.2, 1.3, 66.6), "brownDark", { surface = "veneer" })
 	Props.plant(f, CFrame.new(-21.5, 0, 69.5))
 	Props.plant(f, CFrame.new(21.5, 0, 69.5))
 	Props.sign(f, facing(Vector3.new(0, 12, 37.06), SOUTH), 16, 1.6, "BROADCAST STATION 04", "cream")
@@ -537,8 +690,8 @@ end
 
 function Furnish.ControlRoom(f)
 	-- Monitor wall along the north wall: live CCTV feeds.
-	part(f, "MonitorBank", Vector3.new(32, 3.2, 2.6), CFrame.new(0, 1.6, -17.7), "greyDark", { material = Enum.Material.Metal })
-	part(f, "MonitorShelf", Vector3.new(32, 0.3, 2.2), CFrame.new(0, 6.1, -18), "greyDark", { material = Enum.Material.Metal })
+	part(f, "MonitorBank", Vector3.new(32, 3.2, 2.6), CFrame.new(0, 1.6, -17.7), "greyDark", { surface = "paintedMetal" })
+	part(f, "MonitorShelf", Vector3.new(32, 0.3, 2.2), CFrame.new(0, 6.1, -18), "greyDark", { surface = "paintedMetal" })
 	local lower = { "CAM01", "CAM02", "CAM03", "CAM06", "CAM07" }
 	local upper = { "CAM08", "CAM10", "CAM11", "CAM12", "CAM04" }
 	for i = 1, 5 do
@@ -582,7 +735,7 @@ function Furnish.Generator(f)
 	Props.generator(f, facing(Vector3.new(-118, 0, 0), NORTH))
 	Props.cage(f, facing(Vector3.new(-131.7, 0, 14), EAST))
 	Props.relayBox(f, facing(Vector3.new(-101.45, 4, -15.2), WEST), "WEST RELAY")
-	part(f, "Workbench", Vector3.new(3, 2.6, 2), CFrame.new(-107.2, 1.3, 14), "brownDark", { material = Enum.Material.Wood })
+	part(f, "Workbench", Vector3.new(3, 2.6, 2), CFrame.new(-107.2, 1.3, 14), "brownDark", { surface = "veneer" })
 	Props.cabinet(f, facing(Vector3.new(-127, 0, -15.2), SOUTH), 2.4, 2.6, 1.6, "greyDark")
 	for i = 0, 2 do
 		Props.cabinet(f, facing(Vector3.new(-128 + i * 5, 0, -18.6), SOUTH), 3, 6.5, 1.4, "grey")
@@ -601,10 +754,10 @@ function Furnish.EditingSuite(f)
 	monitor(f, facing(Vector3.new(-73.5, 3.4, -31.4), SOUTH), 0.9)
 	Props.chair(f, facing(Vector3.new(-78, 0, -27), NORTH), "blueDark")
 	for _, pos in { Vector3.new(-85.68, 0, -18.6), Vector3.new(-70.32, 0, -14.4) } do
-		part(f, "Cart", Vector3.new(1.8, 2.6, 1.4), CFrame.new(pos + Vector3.new(0, 1.3, 0)), "grey", { material = Enum.Material.Metal })
+		part(f, "Cart", Vector3.new(1.8, 2.6, 1.4), CFrame.new(pos + Vector3.new(0, 1.3, 0)), "grey", { surface = "paintedMetal" })
 	end
 	for i = 0, 3 do
-		part(f, "AcousticPanel", Vector3.new(0.2, 4, 3), CFrame.new(-89.1, 5.5, -30 + i * 6), "blueDark", { material = Enum.Material.Fabric, collide = false })
+		part(f, "AcousticPanel", Vector3.new(0.2, 4, 3), CFrame.new(-89.1, 5.5, -30 + i * 6), "blueDark", { surface = "acousticFoam", collide = false })
 	end
 	Props.sign(f, facing(Vector3.new(-78, 9.8, -7.06), NORTH), 7, 0.9, "EDIT BAY · SOUNDPROOF · KEEP DOOR SHUT", "blueDark", Color3.fromRGB(196, 186, 158))
 end
@@ -662,7 +815,7 @@ end
 function Furnish.Transmitter(f)
 	Props.transmitter(f, facing(Vector3.new(0, 0, -80), SOUTH))
 	-- Socket console (I_SOCKET_*) on the transmitter's south side.
-	part(f, "SocketConsole", Vector3.new(20, 3.3, 2), CFrame.new(0, 1.65, -70.4), "greyDark", { material = Enum.Material.Metal })
+	part(f, "SocketConsole", Vector3.new(20, 3.3, 2), CFrame.new(0, 1.65, -70.4), "greyDark", { surface = "paintedMetal" })
 	for i, x in { -6.4, 0, 6.4 } do
 		local socket = part(f, "Socket" .. i, Vector3.new(1.6, 0.4, 1.4), CFrame.new(x, 3.5, -70), "black", { collide = false })
 		socket:SetAttribute("SocketIndex", i)
@@ -671,9 +824,9 @@ function Furnish.Transmitter(f)
 	Props.vcr(f, facing(Vector3.new(-20.5, 3.4, -68.2), SOUTH), "black")
 	monitor(f, facing(Vector3.new(-20.5, 4, -68.9), SOUTH), 0.9, "CAM12", "TransDeck")
 	-- East gantry railing (the watcher's spot).
-	part(f, "Railing", Vector3.new(0.3, 3.4, 30), CFrame.new(18.5, 1.7, -86), "greyDark", { material = Enum.Material.Metal, collide = false })
+	part(f, "Railing", Vector3.new(0.3, 3.4, 30), CFrame.new(18.5, 1.7, -86), "greyDark", { surface = "paintedMetal", collide = false })
 	-- Freight motor lever panel by the north wall.
-	part(f, "LeverPanel", Vector3.new(2.2, 3.2, 0.6), CFrame.new(16, 3.5, -102.7), "cream", { material = Enum.Material.Metal })
+	part(f, "LeverPanel", Vector3.new(2.2, 3.2, 0.6), CFrame.new(16, 3.5, -102.7), "cream", { surface = "paintedMetal" })
 	local lever = part(f, "Lever", Vector3.new(0.3, 1.6, 0.3), CFrame.new(16, 3.8, -102.2) * CFrame.Angles(math.rad(20), 0, 0), Props.rgb(MapLayout.Palette.warning), { collide = false })
 	lever:SetAttribute("FreightLever", true)
 	for i = 0, 3 do
@@ -683,7 +836,7 @@ function Furnish.Transmitter(f)
 end
 
 function Furnish.StudioA(f)
-	part(f, "Backdrop", Vector3.new(26, 12, 0.4), CFrame.new(-56, 6, -71), "blueDark", { material = Enum.Material.Fabric })
+	part(f, "Backdrop", Vector3.new(26, 12, 0.4), CFrame.new(-56, 6, -71), "blueDark", { surface = "upholstery" })
 	Props.desk(f, facing(Vector3.new(-56, 0, -62.4), SOUTH), 10, 3, 3.4, "greyDark")
 	Props.chair(f, facing(Vector3.new(-56, 0, -65), SOUTH), "black")
 	Props.studioCamera(f, facing(Vector3.new(-60, 0, -50), NORTH))
@@ -759,7 +912,7 @@ local function buildLoopProps(station, caseDef)
 			part(model, "LampArm", Vector3.new(0.12, 1.2, 0.12), CFrame.new(pos + Vector3.new(0, 0.7, 0)), "greyDark", { collide = false })
 			for _, v in { { normal, Color3.fromRGB(230, 236, 226) }, { odd, Props.rgb(MapLayout.Palette.amber) } } do
 				local shade = part(v[1], "Shade", Vector3.new(0.8, 0.45, 0.8), CFrame.new(pos + Vector3.new(0, 1.45, 0)), v[2], {
-					material = Enum.Material.Neon,
+					surface = "glow",
 					collide = false,
 					shadow = false,
 				})
@@ -844,6 +997,86 @@ MapBuilder.HQDesks = {
 	{ pos = P("HQ", 0.7, 0.8), look = NORTH },
 }
 
+-- The lived-in office around the terminals: where the team waits between cases.
+local function furnishFieldOffice(f)
+	local detail = Props.detail
+	local wallX = 30 - T
+
+	-- Night window with venetian blinds on the east wall.
+	local wz, wy, ww, wh = 263, 6.5, 9, 4.2
+	local glassCf = facing(Vector3.new(wallX - 0.05, wy, wz), WEST)
+	part(f, "WindowGlass", Vector3.new(ww, wh, 0.05), glassCf, Color3.fromRGB(14, 20, 30), { surface = "glass", collide = false, shadow = false })
+	for _, side in { -1, 1 } do
+		detail(f, "WindowFrame", Vector3.new(0.3, wh + 0.6, 0.25), glassCf * CFrame.new(side * (ww / 2 + 0.15), 0, -0.1), "brownDark", "veneer", { shadow = true })
+		detail(f, "WindowFrame", Vector3.new(ww + 0.6, 0.3, 0.25), glassCf * CFrame.new(0, side * (wh / 2 + 0.15), -0.1), "brownDark", "veneer", { shadow = true })
+	end
+	detail(f, "Sill", Vector3.new(ww + 0.8, 0.15, 0.6), glassCf * CFrame.new(0, -wh / 2 - 0.3, -0.3), "brownDark", "veneer", { shadow = true })
+	for i = 1, 14 do
+		local y = wh / 2 - 0.15 - (i - 1) * 0.27
+		detail(f, "BlindSlat", Vector3.new(ww - 0.1, 0.04, 0.24), glassCf * CFrame.new(0, y, -0.3) * CFrame.Angles(math.rad(35), 0, 0), Color3.fromRGB(204, 198, 178), "paintedMetal", { shadow = true })
+	end
+	detail(f, "BlindCord", Vector3.new(0.04, wh, 0.04), glassCf * CFrame.new(ww / 2 - 0.4, -0.3, -0.42), Color3.fromRGB(200, 196, 180), "upholstery")
+
+	-- Case wall: cork board with photos, notes and red string.
+	local corkCf = facing(Vector3.new(-17, 6.2, 241.12), SOUTH)
+	part(f, "CorkBoard", Vector3.new(7, 4.4, 0.2), corkCf, Color3.fromRGB(150, 112, 72), { surface = "cardboard", collide = false })
+	detail(f, "CorkFrame", Vector3.new(7.3, 4.7, 0.12), corkCf * CFrame.new(0, 0, 0.06), "brownDark", "veneer", { shadow = true })
+	local rng = Rng.new(404)
+	local pins = {}
+	for i = 1, 9 do
+		local x = -3 + (i - 1) % 3 * 3 + (rng:float() - 0.5) * 0.8
+		local y = 1.4 - math.floor((i - 1) / 3) * 1.4 + (rng:float() - 0.5) * 0.4
+		local photo = i % 3 == 0
+		local size = photo and Vector3.new(1.1, 0.8, 0.02) or Vector3.new(0.9, 1.1, 0.02)
+		local colour = photo and Color3.fromRGB(40, 42, 40) or Color3.fromRGB(222, 214, 186)
+		local tilt = (rng:float() - 0.5) * 0.3
+		detail(f, photo and "Photo" or "Note", size, corkCf * CFrame.new(x, y, -0.12) * CFrame.Angles(0, 0, tilt), colour, "paper")
+		local pin = corkCf * CFrame.new(x, y + size.Y / 2 - 0.12, -0.15)
+		detail(f, "Pin", Vector3.new(0.12, 0.12, 0.12), pin, Color3.fromRGB(170, 36, 30), "enamel", { shape = Enum.PartType.Ball })
+		table.insert(pins, pin.Position)
+	end
+	for _, pair in { { 1, 5 }, { 5, 9 }, { 2, 6 }, { 3, 5 }, { 7, 5 } } do
+		local a2, b2 = pins[pair[1]], pins[pair[2]]
+		local mid = (a2 + b2) / 2
+		detail(f, "String", Vector3.new(0.03, 0.03, (b2 - a2).Magnitude), CFrame.lookAt(mid, b2), Color3.fromRGB(176, 30, 26), "upholstery")
+	end
+
+	-- Coffee station and water cooler in the north-east corner.
+	local tableCf = facing(Vector3.new(19, 0, 242.6), SOUTH)
+	Props.desk(f, tableCf, 4, 1.8, 3, "brown")
+	detail(f, "CoffeeMachine", Vector3.new(1, 1.4, 0.9), tableCf * CFrame.new(-0.9, 3.7, 0.1), Color3.fromRGB(30, 30, 28), "blackPlastic", { shadow = true })
+	detail(f, "Jug", Vector3.new(0.65, 0.65, 0.65), tableCf * CFrame.new(-0.9, 3.35, -0.35), Color3.fromRGB(70, 46, 30), "glass", { shape = Enum.PartType.Ball, transparency = 0.2 })
+	for i = 0, 2 do
+		detail(f, "Mug", Vector3.new(0.5, 0.3, 0.3), tableCf * CFrame.new(0.5 + i * 0.5, 3.25, -0.2 + (i % 2) * 0.3) * CFrame.Angles(0, 0, math.rad(90)), i == 1 and Color3.fromRGB(140, 40, 34) or Color3.fromRGB(214, 208, 190), "enamel", { shape = Enum.PartType.Cylinder })
+	end
+	local cooler = CFrame.new(26.6, 0, 243.6)
+	part(f, "WaterCooler", Vector3.new(1.4, 3.2, 1.4), cooler * CFrame.new(0, 1.6, 0), Color3.fromRGB(214, 208, 192), { surface = "vinylCasing" })
+	detail(f, "Bottle", Vector3.new(1.6, 1.1, 1.1), cooler * CFrame.new(0, 4, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(150, 180, 200), "glass", { shape = Enum.PartType.Cylinder, transparency = 0.45, shadow = true })
+	detail(f, "Tap", Vector3.new(0.2, 0.25, 0.2), cooler * CFrame.new(0, 2.6, -0.75), Color3.fromRGB(40, 70, 140), "blackPlastic")
+	detail(f, "CupHolder", Vector3.new(1.1, 0.35, 0.35), cooler * CFrame.new(0.9, 2.2, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(200, 198, 190), "vinylCasing", { shape = Enum.PartType.Cylinder })
+
+	-- Filing cabinets in the north-west corner.
+	for i = 0, 1 do
+		Props.cabinet(f, facing(Vector3.new(-28.2, 0, 245 + i * 2.7), EAST), 2.4, 4.6, 1.8, "greyDark")
+	end
+	Props.crate(f, CFrame.new(-27.8, 4.6, 245), Vector3.new(2, 1.2, 1.4))
+
+	-- Station floor plan, clock, notices and the door sign.
+	Props.poster(f, facing(Vector3.new(-(wallX - 0.04), 6.5, 263), EAST), 6, 4, "BROADCAST STATION 04\nFLOOR PLAN · REV. 1987\nCORE · WEST WING · EAST WING", "cream")
+	Props.wallClock(f, facing(Vector3.new(17, 9.2, 241.15), SOUTH), "00:17")
+	Props.poster(f, facing(Vector3.new(-(wallX - 0.04), 6, 276), EAST), 2.4, 3.2, "DIVISION NOTICE\nNO INVESTIGATOR\nENTERS ALONE\nWITHOUT A RADIO", "creamDark")
+	Props.sign(f, facing(Vector3.new(0, 10.3, 284 - T - 0.1), NORTH), 9, 1.1, "DEPLOYMENT BAY · VAN 4 STANDING BY", "blueDark", Color3.fromRGB(214, 210, 190))
+
+	-- Coat rack by the door, with a jacket hanging on it.
+	local rack = CFrame.new(8, 0, 281.8)
+	part(f, "CoatRack", Vector3.new(0.25, 6.4, 0.25), rack * CFrame.new(0, 3.2, 0), "brownDark", { surface = "veneer", collide = false })
+	detail(f, "RackBase", Vector3.new(0.3, 1.4, 1.4), rack * CFrame.new(0, 0.15, 0) * CFrame.Angles(0, 0, math.rad(90)), "brownDark", "veneer", { shape = Enum.PartType.Cylinder, shadow = true })
+	for i = 0, 3 do
+		detail(f, "Hook", Vector3.new(0.08, 0.08, 0.6), rack * CFrame.Angles(0, math.rad(i * 90), 0) * CFrame.new(0, 6.1, -0.3) * CFrame.Angles(math.rad(25), 0, 0), Color3.fromRGB(150, 140, 110), "bareMetal")
+	end
+	detail(f, "HangingCoat", Vector3.new(1.4, 2.6, 0.5), rack * CFrame.new(0, 4.6, -0.5), Color3.fromRGB(70, 66, 54), "upholstery", { shadow = true })
+end
+
 local function buildHQ(parent)
 	local hq = Instance.new("Model")
 	hq.Name = "FieldOffice"
@@ -859,7 +1092,7 @@ local function buildHQ(parent)
 	for id, def in MapBuilder.HQTerminals do
 		if id ~= "HQ_CASES" then
 			local base = V(def.pos, 0)
-			part(f, id .. "_Stand", Vector3.new(3, 3, 2.4), CFrame.new(base + Vector3.new(0, 1.5, 0)), "greyDark", { material = Enum.Material.Metal })
+			part(f, id .. "_Stand", Vector3.new(3, 3, 2.4), CFrame.new(base + Vector3.new(0, 1.5, 0)), "greyDark", { surface = "paintedMetal" })
 			local dir = base.X < 0 and EAST or WEST
 			local _, screen = Props.beigeComputer(f, facing(base + Vector3.new(0, 3, 0), dir))
 			Props.label(screen, def.label, { textColour = Color3.fromRGB(150, 210, 160), lightInfluence = 0, pixelsPerStud = 40 })
@@ -906,6 +1139,7 @@ local function buildHQ(parent)
 	Props.plant(f, CFrame.new(-27, 0, 281))
 	Props.plant(f, CFrame.new(27, 0, 281))
 	Props.bench(f, facing(Vector3.new(0, 0, 279), NORTH), 8)
+	furnishFieldOffice(f)
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "HQSpawn"
@@ -936,11 +1170,11 @@ end
 
 local function buildExterior(station)
 	local ext = folder(station, "Exterior")
-	part(ext, "Ground", Vector3.new(800, 1, 800), CFrame.new(0, -1.5, 60), Color3.fromRGB(36, 40, 36), { material = Enum.Material.Ground })
+	part(ext, "Ground", Vector3.new(800, 1, 800), CFrame.new(0, -1.5, 60), Color3.fromRGB(36, 40, 36), { surface = "ground" })
 	-- Car park outside the main doors, visible through the glass.
-	part(ext, "CarPark", Vector3.new(60, 0.2, 40), CFrame.new(0, -0.9, 94), Color3.fromRGB(48, 50, 50), { material = Enum.Material.Asphalt })
+	part(ext, "CarPark", Vector3.new(60, 0.2, 40), CFrame.new(0, -0.9, 94), Color3.fromRGB(48, 50, 50), { surface = "asphalt" })
 	for _, x in { -18, 18 } do
-		local pole = part(ext, "LampPost", Vector3.new(0.5, 12, 0.5), CFrame.new(x, 6, 98), "greyDark", { material = Enum.Material.Metal })
+		local pole = part(ext, "LampPost", Vector3.new(0.5, 12, 0.5), CFrame.new(x, 6, 98), "greyDark", { surface = "paintedMetal" })
 		local light = Instance.new("PointLight")
 		light.Range = 20
 		light.Brightness = 0.6
@@ -952,9 +1186,9 @@ local function buildExterior(station)
 	local doorHalf = 4.6
 	for _, side in { -1, 1 } do
 		local width = 28 - doorHalf
-		part(ext, "Facade", Vector3.new(width, 18, 1), CFrame.new(side * (doorHalf + width / 2), 9, 73), "creamDark", { material = Enum.Material.Concrete })
+		part(ext, "Facade", Vector3.new(width, 18, 1), CFrame.new(side * (doorHalf + width / 2), 9, 73), "creamDark", { surface = "concrete" })
 	end
-	part(ext, "FacadeLintel", Vector3.new(doorHalf * 2, 18 - DOOR_H, 1), CFrame.new(0, DOOR_H + (18 - DOOR_H) / 2, 73), "creamDark", { material = Enum.Material.Concrete })
+	part(ext, "FacadeLintel", Vector3.new(doorHalf * 2, 18 - DOOR_H, 1), CFrame.new(0, DOOR_H + (18 - DOOR_H) / 2, 73), "creamDark", { surface = "concrete" })
 	local facadeSign = part(ext, "FacadeSign", Vector3.new(24, 2.4, 0.3), facing(Vector3.new(0, 15.5, 73.7), SOUTH), "black", { collide = false })
 	Props.label(facadeSign, "STATION 04", { textColour = Color3.fromRGB(150, 140, 120), lightInfluence = 1 })
 	return ext

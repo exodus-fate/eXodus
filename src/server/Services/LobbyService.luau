@@ -11,9 +11,11 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local CaseRegistry = require(Shared.Config.CaseRegistry)
 local Cosmetics = require(Shared.Config.Cosmetics)
+local Typeface = require(Shared.Config.Typeface)
 local ProfileSchema = require(Shared.Core.ProfileSchema)
 local Variants = require(Shared.Core.Variants)
 local MapBuilder = require(Shared.World.MapBuilder)
+local Outfits = require(Shared.World.Outfits)
 
 local Router = require(script.Parent.Router)
 
@@ -133,6 +135,7 @@ function LobbyService.sendProfile(player)
 		offline = deps.DataService.isOffline(player),
 		archiveBest = profile.archiveChallengeBest,
 		stats = profile.stats,
+		tutorialSeen = profile.tutorialSeen,
 	})
 end
 
@@ -202,8 +205,22 @@ local function deskOf(player)
 end
 
 ---------------------------------------------------------------------------
--- Character dressing (uniform vest, nameplate, flashlight)
+-- Character dressing (outfit, nameplate, flashlight)
 ---------------------------------------------------------------------------
+
+-- Office clothes in the field office, field kit in the station.
+function LobbyService.outfit(player, character)
+	character = character or player.Character
+	if not character or character.Parent == nil then
+		return
+	end
+	local profile = deps.DataService.get(player)
+	local equipped = profile and profile.cosmetics.equipped or Cosmetics.Defaults
+	local uniform = Cosmetics.Items[equipped.uniform] or Cosmetics.Items.uniform_standard
+	local colour = Color3.fromRGB(uniform.colour[1], uniform.colour[2], uniform.colour[3])
+	local mode = player:GetAttribute("InMission") == true and "Field" or "Lobby"
+	Outfits.apply(character, mode, colour, player.DisplayName)
+end
 
 function LobbyService.dress(player, character)
 	local profile = deps.DataService.get(player)
@@ -214,22 +231,7 @@ function LobbyService.dress(player, character)
 			return
 		end
 		local equipped = profile and profile.cosmetics.equipped or Cosmetics.Defaults
-		local uniform = Cosmetics.Items[equipped.uniform] or Cosmetics.Items.uniform_standard
-		local vest = Instance.new("Part")
-		vest.Name = "UniformVest"
-		vest.Size = Vector3.new(torso.Size.X + 0.15, torso.Size.Y * 0.85, torso.Size.Z + 0.15)
-		vest.CFrame = torso.CFrame
-		vest.Color = Color3.fromRGB(uniform.colour[1], uniform.colour[2], uniform.colour[3])
-		vest.Material = Enum.Material.Fabric
-		vest.CanCollide = false
-		vest.CanQuery = false
-		vest.Massless = true
-		vest.CastShadow = false
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = torso
-		weld.Part1 = vest
-		weld.Parent = vest
-		vest.Parent = character
+		LobbyService.outfit(player, character)
 
 		local plateItem = Cosmetics.Items[equipped.nameplate]
 		if plateItem and plateItem.text then
@@ -243,7 +245,7 @@ function LobbyService.dress(player, character)
 			local text = Instance.new("TextLabel")
 			text.BackgroundTransparency = 1
 			text.Size = UDim2.fromScale(1, 1)
-			text.Font = Enum.Font.Code
+			text.FontFace = Typeface.bold()
 			text.TextScaled = true
 			text.TextColor3 = Color3.fromRGB(196, 186, 158)
 			text.TextStrokeTransparency = 0.5
@@ -445,11 +447,8 @@ function LobbyService.init(dependencies, remoteTable)
 		profile.cosmetics.equipped[item.slot] = payload.item
 		deps.DataService.markDirty(player)
 		LobbyService.sendProfile(player)
-		if player.Character and not inMission(player) then
-			local vest = player.Character:FindFirstChild("UniformVest")
-			if vest and item.slot == "uniform" then
-				vest.Color = Color3.fromRGB(item.colour[1], item.colour[2], item.colour[3])
-			end
+		if item.slot == "uniform" and player.Character then
+			LobbyService.outfit(player)
 		end
 		return { ok = true }
 	end, { rate = 3, burst = 6 })
@@ -537,6 +536,18 @@ function LobbyService.init(dependencies, remoteTable)
 		profile.settings = ProfileSchema.sanitizeSettings(profile.settings, payload.settings)
 		deps.DataService.markDirty(player)
 		return { ok = true, settings = profile.settings }
+	end, { rate = 1, burst = 3 })
+
+	Router.onRequest("SetTutorialSeen", function(player)
+		local profile = profileOf(player)
+		if not profile then
+			return { ok = false }
+		end
+		if not profile.tutorialSeen then
+			profile.tutorialSeen = true
+			deps.DataService.markDirty(player)
+		end
+		return { ok = true }
 	end, { rate = 1, burst = 3 })
 
 	Router.onRequest("GetStore", function(player)

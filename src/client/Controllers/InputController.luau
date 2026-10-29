@@ -16,12 +16,12 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local State = require(script.Parent.Parent.State)
 local HUDController = require(script.Parent.HUDController)
+local CameraController = require(script.Parent.CameraController)
 
 local InputController = {}
 
@@ -29,15 +29,12 @@ local WALK_SPEED = 12
 local SPRINT_SPEED = 19
 local STAMINA_SECONDS = 6
 local STAMINA_REGEN_DELAY = 1
-local DEFAULT_FOV = 70
-local INSPECT_FOV = 40
 
 local sprinting = false
 local stamina = 1
 local lastSprintAt = 0
 local flashlight = false
 local inspecting = false
-local shake = 0
 
 InputController.onTool = nil -- set by ToolController
 InputController.onDeck = nil -- set by Main
@@ -102,7 +99,11 @@ local function muteOwnHeadLight(character)
 end
 
 function InputController.shake(amount)
-	shake = math.max(shake, amount * State.intensity("cameraShake"))
+	CameraController.shake(amount)
+end
+
+function InputController.isSprinting()
+	return sprinting
 end
 
 local function bind(name, fn, touchTitle, ...)
@@ -116,7 +117,12 @@ end
 
 local function setupBindings()
 	bind("DA_Sprint", function(inputState)
-		if inputState == Enum.UserInputState.Begin then
+		-- Hold to sprint, or press once to toggle (Settings > Toggle sprint).
+		if State.settings.toggleSprint then
+			if inputState == Enum.UserInputState.Begin then
+				sprinting = not sprinting
+			end
+		elseif inputState == Enum.UserInputState.Begin then
 			sprinting = true
 		elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 			sprinting = false
@@ -154,6 +160,7 @@ local function setupBindings()
 		elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 			inspecting = false
 		end
+		CameraController.inspecting = inspecting
 		return Enum.ContextActionResult.Pass
 	end, "Inspect", Enum.UserInputType.MouseButton2, Enum.KeyCode.ButtonL2)
 
@@ -184,8 +191,16 @@ end
 local function step(dt)
 	local h = humanoid()
 	local camera = Workspace.CurrentCamera
+	if blocked() and inspecting then
+		inspecting = false
+		CameraController.inspecting = false
+	end
 	if h then
 		local moving = h.MoveDirection.Magnitude > 0.1
+		-- A toggled sprint ends when you stop moving or run out of stamina.
+		if State.settings.toggleSprint and sprinting and (not moving or stamina <= 0) then
+			sprinting = false
+		end
 		local canSprint = sprinting and moving and stamina > 0 and not blocked() and (not State.inMission() or State.isAlive())
 		if canSprint then
 			stamina = math.max(0, stamina - dt / STAMINA_SECONDS)
@@ -197,24 +212,11 @@ local function step(dt)
 		if h.WalkSpeed > 0 and h.WalkSpeed ~= target then
 			h.WalkSpeed = target
 		end
-		if shake > 0.001 then
-			local s = shake
-			h.CameraOffset = Vector3.new((math.random() - 0.5) * s, (math.random() - 0.5) * s, 0)
-			shake = math.max(0, shake - dt * 1.5)
-		elseif h.CameraOffset.Magnitude > 0 then
-			h.CameraOffset = Vector3.zero
-		end
 	end
 	HUDController.stamina = stamina
 	if beamPart and camera then
 		beamPart.CFrame = camera.CFrame * CFrame.new(0.4, -0.4, 0)
 		beam.Enabled = flashlight and State.inMission() and State.isAlive() or (flashlight and not State.inMission())
-	end
-	if camera and camera.CameraType == Enum.CameraType.Custom then
-		local fov = inspecting and INSPECT_FOV or DEFAULT_FOV
-		if math.abs(camera.FieldOfView - fov) > 0.5 then
-			camera.FieldOfView = camera.FieldOfView + (fov - camera.FieldOfView) * math.min(1, dt * 10)
-		end
 	end
 end
 
@@ -249,13 +251,6 @@ function InputController.init()
 			task.delay(1, function()
 				State.action("Flashlight", { on = flashlight })
 			end)
-		end
-	end)
-	-- Smooth FOV snaps back after menus.
-	State.uiChanged:Connect(function()
-		local camera = Workspace.CurrentCamera
-		if camera and not State.anyModal() then
-			TweenService:Create(camera, TweenInfo.new(0.2), { FieldOfView = DEFAULT_FOV }):Play()
 		end
 	end)
 end

@@ -176,7 +176,7 @@ local function build(playerGui)
 	-- Header
 	local header = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = root })
 	widgets.title = UI.text(header, "TIME-SHIFT DECK", {
-		Font = Theme.FontBold,
+		FontFace = Theme.FontBold,
 		TextSize = Theme.LargeText,
 		TextColor3 = Theme.Accent,
 		Size = UDim2.new(0.6, 0, 1, 0),
@@ -288,7 +288,7 @@ local function build(playerGui)
 	UI.padding(right, 10)
 	local scroll = UI.scroll(right, { Size = UDim2.new(1, 0, 1, -112) })
 	UI.list(scroll, 6)
-	widgets.eventTitle = UI.text(scroll, "", { Font = Theme.FontBold, TextColor3 = Theme.Accent, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1 })
+	widgets.eventTitle = UI.text(scroll, "", { FontFace = Theme.FontBold, TextColor3 = Theme.Accent, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1 })
 	widgets.eventMeta = UI.text(scroll, "", { TextColor3 = Theme.TextDim, TextSize = Theme.SmallText, AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2 })
 	widgets.eventState = UI.text(scroll, "", { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3 })
 	widgets.alternatives = UI.new("Frame", { BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y, Size = UDim2.new(1, 0, 0, 0), LayoutOrder = 4, Parent = scroll })
@@ -824,6 +824,7 @@ function DeckController.open(opts)
 	widgets.scrubber.Visible = opts.mode ~= "handheld"
 	gui.Enabled = true
 	State.setUI("deck", true)
+	view:powerOn()
 	if opts.mode == "mission" then
 		State.action("DeckOpen", { deck = opts.deckId })
 	elseif opts.mode == "handheld" then

@@ -5,6 +5,10 @@
 	equally readable.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Typeface = require(ReplicatedStorage:WaitForChild("Shared").Config.Typeface)
+
 local Theme = {}
 
 Theme.Background = Color3.fromRGB(10, 14, 12)
@@ -21,9 +25,10 @@ Theme.Danger = Color3.fromRGB(206, 76, 60)
 Theme.Good = Color3.fromRGB(120, 200, 120)
 Theme.Black = Color3.fromRGB(0, 0, 0)
 
-Theme.Font = Enum.Font.Code
-Theme.FontBold = Enum.Font.RobotoMono
-Theme.FontTitle = Enum.Font.SpecialElite
+-- One family everywhere (see Shared.Config.Typeface); weights set hierarchy.
+Theme.Font = Typeface.regular()
+Theme.FontBold = Typeface.bold()
+Theme.FontTitle = Typeface.bold()
 
 Theme.TextSize = 16
 Theme.SmallText = 13
