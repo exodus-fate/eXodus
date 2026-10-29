@@ -1,0 +1,96 @@
+{
+  "name": "DeadAir",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "$properties": {
+        "CameraMode": "LockFirstPerson",
+        "CharacterWalkSpeed": 12,
+        "CharacterUseJumpPower": false,
+        "CharacterJumpHeight": 4,
+        "EnableMouseLockOption": false,
+        "CameraMaxZoomDistance": 0.5,
+        "CameraMinZoomDistance": 0.5
+      },
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Technology": "ShadowMap",
+        "ClockTime": 1,
+        "Brightness": 1.2,
+        "ExposureCompensation": -0.3,
+        "Ambient": [0.13, 0.15, 0.14],
+        "OutdoorAmbient": [0.17, 0.19, 0.18],
+        "GlobalShadows": true,
+        "EnvironmentDiffuseScale": 0.15,
+        "EnvironmentSpecularScale": 0.2
+      },
+      "StationAtmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.22,
+          "Offset": 0,
+          "Color": [0.47, 0.51, 0.47],
+          "Decay": [0.24, 0.27, 0.24],
+          "Glare": 0,
+          "Haze": 0.6
+        }
+      },
+      "StationGrade": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Saturation": -0.32,
+          "Contrast": 0.12,
+          "Brightness": -0.02,
+          "TintColor": [0.93, 0.97, 0.93]
+        }
+      },
+      "StationBloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Intensity": 0.35,
+          "Size": 16,
+          "Threshold": 1.7
+        }
+      }
+    },
+
+    "SoundService": {
+      "$properties": {
+        "AmbientReverb": "Hangar",
+        "RolloffScale": 1
+      }
+    }
+  }
+}

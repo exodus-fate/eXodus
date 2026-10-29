@@ -1,0 +1,8 @@
+std = "roblox"
+
+[lints]
+# Services are commonly fetched up front even when a branch does not use them.
+unused_variable = "warn"
+shadowing = "allow"
+# Style preference only.
+roblox_manual_fromscale_or_fromoffset = "allow"
